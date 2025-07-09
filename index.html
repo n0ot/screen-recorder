@@ -153,14 +153,9 @@
             try {
                 const selectedAudioDeviceId = audioDeviceSelect.value;
                 if (selectedAudioDeviceId !== 'none') {
-                    // First, get the microphone stream. This will trigger permissions.
                     micStream = await navigator.mediaDevices.getUserMedia({
                         audio: { deviceId: { exact: selectedAudioDeviceId } }
                     });
-                    // With permission, we can now get accurate device labels.
-                    await populateAudioDevices();
-                    // Restore selection, since the list was rebuilt.
-                    audioDeviceSelect.value = selectedAudioDeviceId;
                 }
 
                 // Get screen and tab audio
@@ -258,6 +253,8 @@
                     message = 'Permission to access screen was denied. Please try again and allow access.';
                 } else if (err.name === 'NotFoundError') {
                     message = 'No display media found. Please ensure you have a screen to share.';
+                } else if (err.name === 'OverconstrainedError') {
+                    message = `Error with microphone selection: ${err.message}. The selected device may be unavailable. Please try another device.`;
                 }
                 statusDiv.textContent = message;
                 updateButtons(false);
