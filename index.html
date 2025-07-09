@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local Screen Recorder</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f4f4; }
+        .controls button { margin: 10px; padding: 12px 24px; font-size: 1.1em; cursor: pointer; border: none; border-radius: 5px; transition: background-color 0.3s; }
+        #startButton { background-color: #4CAF50; color: white; }
+        #startButton:hover { background-color: #45a049; }
+        #stopButton { background-color: #f44336; color: white; }
+        #stopButton:hover { background-color: #da190b; }
+        #pauseButton, #resumeButton { background-color: #008CBA; color: white; }
+        #pauseButton:hover, #resumeButton:hover { background-color: #007bb5; }
+        #downloadLink { display: none; margin-top: 20px; padding: 10px 20px; background-color: #555; color: white; text-decoration: none; border-radius: 5px; }
+        #status { margin-top: 20px; font-size: 1.2em; color: #333; }
+        #videoPreview { border: 1px solid #ccc; margin-top: 20px; max-width: 80%; height: auto; display: none; }
+    </style>
+</head>
+<body>
+    <h1>Local Screen Recorder</h1>
+    <div class="controls">
+        <button id="startButton">Start Recording</button>
+        <button id="pauseButton" disabled>Pause</button>
+        <button id="resumeButton" disabled>Resume</button>
+        <button id="stopButton" disabled>Stop Recording</button>
+    </div>
+    <video id="videoPreview" autoplay muted></video>
+    <a id="downloadLink" href="#" download="my-screen-recording.webm">Download Video</a>
+    <p id="status"></p>
+
+    <script>
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const pauseButton = document.getElementById('pauseButton');
+        const resumeButton = document.getElementById('resumeButton');
+        const downloadLink = document.getElementById('downloadLink');
+        const statusDiv = document.getElementById('status');
+        const videoPreview = document.getElementById('videoPreview');
+
+        let mediaRecorder;
+        let recordedChunks = [];
+        let stream; // To keep track of the stream to stop it later
+
+        // Function to update button states
+        function updateButtons(recording = false, paused = false) {
+            startButton.disabled = recording;
+            stopButton.disabled = !recording;
+            pauseButton.disabled = !recording || paused;
+            resumeButton.disabled = !recording || !paused;
+        }
+
+        // Initial button state
+        updateButtons(false);
+
+        startButton.addEventListener('click', async () => {
+            recordedChunks = [];
+            downloadLink.style.display = 'none';
+            statusDiv.textContent = 'Awaiting permission...';
+            videoPreview.style.display = 'none'; // Hide preview initially
+
+            try {
+                // Request access to display (screen, window, or tab) and audio
+                // You can specify preferred MIME types, e.g., 'video/webm;codecs=vp8,opus'
+                // For better quality and smaller file size, VP9 or H.264 is preferred if supported.
+                // 'video/webm;codecs=vp9,opus' or 'video/mp4;codecs=avc1' (latter less widely supported by MediaRecorder directly for all browsers)
+                const options = {
+                    video: {
+                        cursor: "always", // "always", "motion", "never"
+                        displaySurface: "browser", // "browser", "monitor", "window" - 'browser' hint is important for tab selection
+                    },
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true
+                    }
+                };
+
+                stream = await navigator.mediaDevices.getDisplayMedia(options);
+                // Also get audio from microphone if desired, combine streams
+                // const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                // stream.addTrack(audioStream.getAudioTracks()[0]);
+
+                videoPreview.srcObject = stream;
+                videoPreview.style.display = 'block'; // Show preview once stream is active
+
+                // MediaRecorder setup
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: 'video/webm;codecs=vp8,opus', // Good balance of quality/compatibility
+                    // mimeType: 'video/webm;codecs=vp9,opus', // Better quality, possibly smaller files
+                    // videoBitsPerSecond: 2_000_000, // Adjust for quality (e.g., 2Mbps)
+                });
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(recordedChunks, {
+                        type: 'video/webm'
+                    });
+                    const url = URL.createObjectURL(blob);
+                    downloadLink.href = url;
+                    downloadLink.style.display = 'block';
+                    statusDiv.textContent = 'Recording finished. Click to download.';
+                    // Stop all tracks in the stream to release resources
+                    stream.getTracks().forEach(track => track.stop());
+                    videoPreview.srcObject = null; // Clear preview
+                    updateButtons(false);
+                };
+
+                mediaRecorder.onpause = () => {
+                    statusDiv.textContent = 'Recording paused.';
+                    updateButtons(true, true);
+                };
+
+                mediaRecorder.onresume = () => {
+                    statusDiv.textContent = 'Recording resumed.';
+                    updateButtons(true, false);
+                };
+
+                mediaRecorder.start();
+                statusDiv.textContent = 'Recording...';
+                updateButtons(true, false);
+
+            } catch (err) {
+                console.error('Error: ' + err);
+                statusDiv.textContent = `Error: ${err.message}`;
+                updateButtons(false);
+            }
+        });
+
+        pauseButton.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.pause();
+            }
+        });
+
+        resumeButton.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state === 'paused') {
+                mediaRecorder.resume();
+            }
+        });
+
+        stopButton.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+        });
+    </script>
+</body>
+</html>
