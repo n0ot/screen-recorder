@@ -20,19 +20,24 @@
         #micMuteButton { background-color: #ff9800; color: white; border: none; cursor: pointer; }
         #micMuteButton:hover:not(:disabled) { background-color: #fb8c00; }
         #micMuteButton:disabled { background-color: #9e9e9e; cursor: not-allowed; }
+        #requestMicButton { background-color: #008CBA; color: white; padding: 12px 24px; font-size: 1.1em; cursor: pointer; border: none; border-radius: 5px; }
+        #requestMicButton:hover { background-color: #007bb5; }
     </style>
 </head>
 <body>
     <h1>Local Screen Recorder</h1>
-    <div class="controls">
-        <button id="startButton">Start Recording</button>
-        <button id="pauseButton" disabled>Pause</button>
-        <button id="resumeButton" disabled>Resume</button>
-        <button id="stopButton" disabled>Stop Recording</button>
-    </div>
-    <div class="mic-controls" style="margin-top: 10px; display: flex; align-items: center; gap: 10px;">
-        <select id="audioDeviceSelect" title="Select microphone"></select>
-        <button id="micMuteButton" disabled>Mute Mic</button>
+    <button id="requestMicButton">Grant Microphone Access</button>
+    <div id="recorderControls" style="display: none; text-align: center; width: 100%;">
+        <div class="controls">
+            <button id="startButton">Start Recording</button>
+            <button id="pauseButton" disabled>Pause</button>
+            <button id="resumeButton" disabled>Resume</button>
+            <button id="stopButton" disabled>Stop Recording</button>
+        </div>
+        <div class="mic-controls" style="margin-top: 10px; display: inline-flex; align-items: center; gap: 10px;">
+            <select id="audioDeviceSelect" title="Select microphone"></select>
+            <button id="micMuteButton" disabled>Mute Mic</button>
+        </div>
     </div>
     <video id="videoPreview" autoplay muted></video>
     <a id="downloadLink" href="#" download="my-screen-recording.webm">Download Video</a>
@@ -48,6 +53,8 @@
         const videoPreview = document.getElementById('videoPreview');
         const audioDeviceSelect = document.getElementById('audioDeviceSelect');
         const micMuteButton = document.getElementById('micMuteButton');
+        const requestMicButton = document.getElementById('requestMicButton');
+        const recorderControls = document.getElementById('recorderControls');
 
         let mediaRecorder;
         let recordedChunks = [];
@@ -68,6 +75,29 @@
 
         // Initial button state
         updateButtons(false);
+
+        requestMicButton.addEventListener('click', async () => {
+            requestMicButton.disabled = true;
+            statusDiv.textContent = 'Requesting microphone access...';
+            try {
+                // Request access to get the device list with labels
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                // We don't need this stream now, so stop it.
+                stream.getTracks().forEach(track => track.stop());
+
+                await populateAudioDevices();
+                // Listen for device changes from now on
+                navigator.mediaDevices.ondevicechange = populateAudioDevices;
+
+                requestMicButton.style.display = 'none';
+                recorderControls.style.display = 'block';
+                statusDiv.textContent = 'Ready. Select your microphone and start recording.';
+            } catch (err) {
+                console.error('Error getting microphone permission:', err);
+                statusDiv.textContent = `Could not get microphone permission: ${err.name}. Please check your browser settings.`;
+                requestMicButton.disabled = false;
+            }
+        });
 
         async function populateAudioDevices() {
             try {
@@ -103,9 +133,6 @@
             }
         }
         
-        // Populate devices on load and when devices change
-        populateAudioDevices();
-        navigator.mediaDevices.ondevicechange = populateAudioDevices;
 
         micMuteButton.addEventListener('click', () => {
             if (!micStream) return;
@@ -225,9 +252,18 @@
                 updateButtons(true, false);
 
             } catch (err) {
-                console.error('Error: ' + err);
-                statusDiv.textContent = `Error: ${err.message}`;
+                console.error('Error starting recording:', err);
+                let message = `Error starting recording: ${err.name} - ${err.message}`;
+                if (err.name === 'NotAllowedError') {
+                    message = 'Permission to access screen was denied. Please try again and allow access.';
+                } else if (err.name === 'NotFoundError') {
+                    message = 'No display media found. Please ensure you have a screen to share.';
+                }
+                statusDiv.textContent = message;
                 updateButtons(false);
+                // Also clean up any partial streams
+                if (displayStream) displayStream.getTracks().forEach(track => track.stop());
+                if (micStream) micStream.getTracks().forEach(track => track.stop());
             }
         });
 
