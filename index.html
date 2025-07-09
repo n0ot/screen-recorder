@@ -165,13 +165,14 @@
                 if (element.checked) {
                     // Enable compressor
                     if (!compressorNode) {
-                        // More gentle compression settings to be less reactive to constant background noise
+                        // Settings for a vocal leveler/compressor. This provides AGC.
+                        // It keeps the voice level consistent, even when moving away from the mic.
                         compressorNode = audioContext.createDynamicsCompressor();
-                        compressorNode.threshold.value = -24; // Only compress louder sounds
-                        compressorNode.knee.value = 30;
-                        compressorNode.ratio.value = 4; // Compress less aggressively
-                        compressorNode.attack.value = 0.05; // Slower attack to preserve transients
-                        compressorNode.release.value = 0.25; // Faster release to recover from background noise
+                        compressorNode.threshold.value = -50; // Start compressing even at low volumes
+                        compressorNode.knee.value = 40;      // Soft knee for a gradual, less noticeable effect
+                        compressorNode.ratio.value = 12;     // A common ratio for leveling vocals
+                        compressorNode.attack.value = 0.01;  // Faster attack to catch sounds quickly
+                        compressorNode.release.value = 0.25; // Standard release time
                     }
                     gainNode.disconnect();
                     gainNode.connect(compressorNode);
@@ -249,7 +250,10 @@
                     mediaStreamDestination = audioContext.createMediaStreamDestination();
                     
                     const tabSource = audioContext.createMediaStreamSource(new MediaStream([tabAudioTracks[0]]));
-                    tabSource.connect(mediaStreamDestination);
+                    const tabGainNode = audioContext.createGain();
+                    tabGainNode.gain.value = 0.7; // Reduce tab audio volume to 70% to make mic more prominent
+                    tabSource.connect(tabGainNode);
+                    tabGainNode.connect(mediaStreamDestination);
 
                     micSource = audioContext.createMediaStreamSource(new MediaStream([micAudioTracks[0]]));
                     gainNode = audioContext.createGain();
@@ -257,13 +261,14 @@
                     micSource.connect(gainNode);
 
                     if (autoGainCheckbox.checked) {
-                        // More gentle compression settings to be less reactive to constant background noise
+                        // Settings for a vocal leveler/compressor. This provides AGC.
+                        // It keeps the voice level consistent, even when moving away from the mic.
                         compressorNode = audioContext.createDynamicsCompressor();
-                        compressorNode.threshold.value = -24; // Only compress louder sounds
-                        compressorNode.knee.value = 30;
-                        compressorNode.ratio.value = 4; // Compress less aggressively
-                        compressorNode.attack.value = 0.05; // Slower attack to preserve transients
-                        compressorNode.release.value = 0.25; // Faster release to recover from background noise
+                        compressorNode.threshold.value = -50; // Start compressing even at low volumes
+                        compressorNode.knee.value = 40;      // Soft knee for a gradual, less noticeable effect
+                        compressorNode.ratio.value = 12;     // A common ratio for leveling vocals
+                        compressorNode.attack.value = 0.01;  // Faster attack to catch sounds quickly
+                        compressorNode.release.value = 0.25; // Standard release time
                         gainNode.connect(compressorNode);
                         compressorNode.connect(mediaStreamDestination);
                     } else {
