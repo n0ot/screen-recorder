@@ -16,6 +16,10 @@
         #downloadLink { display: none; margin-top: 20px; padding: 10px 20px; background-color: #555; color: white; text-decoration: none; border-radius: 5px; }
         #status { margin-top: 20px; font-size: 1.2em; color: #333; }
         #videoPreview { border: 1px solid #ccc; margin-top: 20px; max-width: 80%; height: auto; display: none; }
+        .mic-controls select, .mic-controls button { padding: 8px 12px; font-size: 1em; border-radius: 5px; border: 1px solid #ccc; }
+        #micMuteButton { background-color: #ff9800; color: white; border: none; cursor: pointer; }
+        #micMuteButton:hover:not(:disabled) { background-color: #fb8c00; }
+        #micMuteButton:disabled { background-color: #9e9e9e; cursor: not-allowed; }
     </style>
 </head>
 <body>
@@ -25,6 +29,10 @@
         <button id="pauseButton" disabled>Pause</button>
         <button id="resumeButton" disabled>Resume</button>
         <button id="stopButton" disabled>Stop Recording</button>
+    </div>
+    <div class="mic-controls" style="margin-top: 10px; display: flex; align-items: center; gap: 10px;">
+        <select id="audioDeviceSelect" title="Select microphone"></select>
+        <button id="micMuteButton" disabled>Mute Mic</button>
     </div>
     <video id="videoPreview" autoplay muted></video>
     <a id="downloadLink" href="#" download="my-screen-recording.webm">Download Video</a>
@@ -38,10 +46,15 @@
         const downloadLink = document.getElementById('downloadLink');
         const statusDiv = document.getElementById('status');
         const videoPreview = document.getElementById('videoPreview');
+        const audioDeviceSelect = document.getElementById('audioDeviceSelect');
+        const micMuteButton = document.getElementById('micMuteButton');
 
         let mediaRecorder;
         let recordedChunks = [];
-        let stream; // To keep track of the stream to stop it later
+        let displayStream;
+        let micStream;
+        let mixedStream;
+        let audioContext;
 
         // Function to update button states
         function updateButtons(recording = false, paused = false) {
@@ -49,46 +62,121 @@
             stopButton.disabled = !recording;
             pauseButton.disabled = !recording || paused;
             resumeButton.disabled = !recording || !paused;
+            micMuteButton.disabled = !recording || !micStream; // Disable if no mic stream
+            audioDeviceSelect.disabled = recording;
         }
 
         // Initial button state
         updateButtons(false);
 
+        async function populateAudioDevices() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const audioDevices = devices.filter(device => device.kind === 'audioinput');
+                
+                const currentSelection = audioDeviceSelect.value;
+                audioDeviceSelect.innerHTML = ''; // Clear existing options
+                
+                audioDevices.forEach(device => {
+                    const option = document.createElement('option');
+                    option.value = device.deviceId;
+                    option.text = device.label || `Microphone ${audioDeviceSelect.length + 1}`;
+                    audioDeviceSelect.appendChild(option);
+                });
+                
+                // Add option for no microphone
+                const noMicOption = document.createElement('option');
+                noMicOption.value = 'none';
+                noMicOption.text = 'No Microphone';
+                audioDeviceSelect.appendChild(noMicOption);
+                
+                // Restore selection if possible, otherwise default to 'none'
+                if (Array.from(audioDeviceSelect.options).some(o => o.value === currentSelection)) {
+                    audioDeviceSelect.value = currentSelection;
+                } else {
+                    audioDeviceSelect.value = 'none';
+                }
+
+            } catch (err) {
+                console.error('Could not enumerate audio devices:', err);
+                audioDeviceSelect.innerHTML = '<option value="none">Could not access microphones</option>';
+            }
+        }
+        
+        // Populate devices on load and when devices change
+        populateAudioDevices();
+        navigator.mediaDevices.ondevicechange = populateAudioDevices;
+
+        micMuteButton.addEventListener('click', () => {
+            if (!micStream) return;
+            const micTrack = micStream.getAudioTracks()[0];
+            if (micTrack) {
+                micTrack.enabled = !micTrack.enabled;
+                micMuteButton.textContent = micTrack.enabled ? 'Mute Mic' : 'Unmute Mic';
+            }
+        });
+
         startButton.addEventListener('click', async () => {
             recordedChunks = [];
+            micStream = null; // Reset mic stream
             downloadLink.style.display = 'none';
             statusDiv.textContent = 'Awaiting permission...';
-            videoPreview.style.display = 'none'; // Hide preview initially
+            videoPreview.style.display = 'none';
 
             try {
-                // Request access to display (screen, window, or tab) and audio
-                // You can specify preferred MIME types, e.g., 'video/webm;codecs=vp8,opus'
-                // For better quality and smaller file size, VP9 or H.264 is preferred if supported.
-                // 'video/webm;codecs=vp9,opus' or 'video/mp4;codecs=avc1' (latter less widely supported by MediaRecorder directly for all browsers)
-                const options = {
+                // Get screen and tab audio
+                displayStream = await navigator.mediaDevices.getDisplayMedia({
                     video: {
-                        cursor: "always", // "always", "motion", "never"
-                        displaySurface: "browser", // "browser", "monitor", "window" - 'browser' hint is important for tab selection
+                        cursor: "always",
+                        displaySurface: "browser",
                     },
                     audio: {
-                        echoCancellation: true,
-                        noiseSuppression: true
-                    }
-                };
+                        // High-quality tab audio
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false,
+                    },
+                });
 
-                stream = await navigator.mediaDevices.getDisplayMedia(options);
-                // Also get audio from microphone if desired, combine streams
-                // const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                // stream.addTrack(audioStream.getAudioTracks()[0]);
+                // Now that we have permission, repopulate devices to get labels
+                await populateAudioDevices();
+                
+                const selectedAudioDeviceId = audioDeviceSelect.value;
+                if (selectedAudioDeviceId !== 'none') {
+                    micStream = await navigator.mediaDevices.getUserMedia({
+                        audio: { deviceId: { exact: selectedAudioDeviceId } }
+                    });
+                }
 
-                videoPreview.srcObject = stream;
-                videoPreview.style.display = 'block'; // Show preview once stream is active
+                const tracks = [...displayStream.getVideoTracks()];
+                const tabAudioTracks = displayStream.getAudioTracks();
+                const micAudioTracks = micStream ? micStream.getAudioTracks() : [];
 
-                // MediaRecorder setup
-                mediaRecorder = new MediaRecorder(stream, {
-                    mimeType: 'video/webm;codecs=vp8,opus', // Good balance of quality/compatibility
-                    // mimeType: 'video/webm;codecs=vp9,opus', // Better quality, possibly smaller files
-                    // videoBitsPerSecond: 2_000_000, // Adjust for quality (e.g., 2Mbps)
+                if (micAudioTracks.length > 0 && tabAudioTracks.length > 0) {
+                    audioContext = new AudioContext();
+                    const destination = audioContext.createMediaStreamDestination();
+                    
+                    const tabSource = audioContext.createMediaStreamSource(new MediaStream([tabAudioTracks[0]]));
+                    tabSource.connect(destination);
+
+                    const micSource = audioContext.createMediaStreamSource(new MediaStream([micAudioTracks[0]]));
+                    micSource.connect(destination);
+
+                    tracks.push(destination.stream.getAudioTracks()[0]);
+                } else if (tabAudioTracks.length > 0) {
+                    tracks.push(tabAudioTracks[0]);
+                } else if (micAudioTracks.length > 0) {
+                    tracks.push(micAudioTracks[0]);
+                }
+                
+                mixedStream = new MediaStream(tracks);
+
+                // Preview the screen, but without audio to prevent feedback
+                videoPreview.srcObject = displayStream;
+                videoPreview.style.display = 'block';
+
+                mediaRecorder = new MediaRecorder(mixedStream, {
+                    mimeType: 'video/webm;codecs=vp9,opus', // Use VP9 for better quality
                 });
 
                 mediaRecorder.ondataavailable = (event) => {
@@ -105,9 +193,17 @@
                     downloadLink.href = url;
                     downloadLink.style.display = 'block';
                     statusDiv.textContent = 'Recording finished. Click to download.';
-                    // Stop all tracks in the stream to release resources
-                    stream.getTracks().forEach(track => track.stop());
-                    videoPreview.srcObject = null; // Clear preview
+
+                    // Stop all tracks from all streams
+                    displayStream.getTracks().forEach(track => track.stop());
+                    if (micStream) {
+                        micStream.getTracks().forEach(track => track.stop());
+                    }
+                    if (audioContext) {
+                        audioContext.close();
+                    }
+
+                    videoPreview.srcObject = null;
                     updateButtons(false);
                 };
 
@@ -123,6 +219,7 @@
 
                 mediaRecorder.start();
                 statusDiv.textContent = 'Recording...';
+                micMuteButton.textContent = 'Mute Mic';
                 updateButtons(true, false);
 
             } catch (err) {
