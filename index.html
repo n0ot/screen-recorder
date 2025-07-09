@@ -124,6 +124,18 @@
             videoPreview.style.display = 'none';
 
             try {
+                const selectedAudioDeviceId = audioDeviceSelect.value;
+                if (selectedAudioDeviceId !== 'none') {
+                    // First, get the microphone stream. This will trigger permissions.
+                    micStream = await navigator.mediaDevices.getUserMedia({
+                        audio: { deviceId: { exact: selectedAudioDeviceId } }
+                    });
+                    // With permission, we can now get accurate device labels.
+                    await populateAudioDevices();
+                    // Restore selection, since the list was rebuilt.
+                    audioDeviceSelect.value = selectedAudioDeviceId;
+                }
+
                 // Get screen and tab audio
                 displayStream = await navigator.mediaDevices.getDisplayMedia({
                     video: {
@@ -137,17 +149,7 @@
                         autoGainControl: false,
                     },
                 });
-
-                // Now that we have permission, repopulate devices to get labels
-                await populateAudioDevices();
                 
-                const selectedAudioDeviceId = audioDeviceSelect.value;
-                if (selectedAudioDeviceId !== 'none') {
-                    micStream = await navigator.mediaDevices.getUserMedia({
-                        audio: { deviceId: { exact: selectedAudioDeviceId } }
-                    });
-                }
-
                 const tracks = [...displayStream.getVideoTracks()];
                 const tabAudioTracks = displayStream.getAudioTracks();
                 const micAudioTracks = micStream ? micStream.getAudioTracks() : [];
