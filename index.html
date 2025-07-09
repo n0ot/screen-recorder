@@ -72,6 +72,9 @@
         let micStream;
         let mixedStream;
         let audioContext;
+        let micSource;
+        let compressorNode;
+        let mediaStreamDestination;
 
         // Function to update button states
         function updateButtons(recording = false, paused = false) {
@@ -154,6 +157,34 @@
         });
 
         async function applyAudioConstraint(constraint, element) {
+            // Handle custom AGC via Web Audio API
+            if (constraint === 'autoGainControl') {
+                if (!audioContext || !micSource || !mediaStreamDestination) return;
+                
+                if (element.checked) {
+                    // Enable compressor
+                    if (!compressorNode) {
+                        compressorNode = audioContext.createDynamicsCompressor();
+                        compressorNode.threshold.value = -30;
+                        compressorNode.knee.value = 30;
+                        compressorNode.ratio.value = 6;
+                        compressorNode.attack.value = 0.01;
+                        compressorNode.release.value = 0.5;
+                    }
+                    micSource.disconnect();
+                    micSource.connect(compressorNode);
+                    compressorNode.connect(mediaStreamDestination);
+                    console.log('Custom AGC enabled');
+                } else {
+                    // Disable compressor by bypassing it
+                    micSource.disconnect();
+                    micSource.connect(mediaStreamDestination);
+                    console.log('Custom AGC disabled');
+                }
+                return;
+            }
+
+            // Handle other constraints via standard track applyConstraints
             if (!micStream) return;
             const [track] = micStream.getAudioTracks();
             if (track) {
@@ -161,6 +192,7 @@
                     await track.applyConstraints({ [constraint]: element.checked });
                     console.log(`Applied constraint: ${constraint} = ${element.checked}`);
                 } catch (err) {
+                    // Note: Not all constraints can be changed live. This may fail silently on some browsers.
                     console.error(`Error applying constraint ${constraint}:`, err);
                     statusDiv.textContent = `Error: Could not apply '${constraint}'. Reverting.`;
                     element.checked = !element.checked; // Revert checkbox on failure
@@ -185,7 +217,7 @@
                     micStream = await navigator.mediaDevices.getUserMedia({
                         audio: {
                             deviceId: { exact: selectedAudioDeviceId },
-                            autoGainControl: autoGainCheckbox.checked,
+                            autoGainControl: false, // Use our own custom AGC instead
                             noiseSuppression: noiseSuppressionCheckbox.checked,
                             echoCancellation: echoCancellationCheckbox.checked
                         }
@@ -212,15 +244,27 @@
 
                 if (micAudioTracks.length > 0 && tabAudioTracks.length > 0) {
                     audioContext = new AudioContext();
-                    const destination = audioContext.createMediaStreamDestination();
+                    mediaStreamDestination = audioContext.createMediaStreamDestination();
                     
                     const tabSource = audioContext.createMediaStreamSource(new MediaStream([tabAudioTracks[0]]));
-                    tabSource.connect(destination);
+                    tabSource.connect(mediaStreamDestination);
 
-                    const micSource = audioContext.createMediaStreamSource(new MediaStream([micAudioTracks[0]]));
-                    micSource.connect(destination);
+                    micSource = audioContext.createMediaStreamSource(new MediaStream([micAudioTracks[0]]));
 
-                    tracks.push(destination.stream.getAudioTracks()[0]);
+                    if (autoGainCheckbox.checked) {
+                        compressorNode = audioContext.createDynamicsCompressor();
+                        compressorNode.threshold.value = -30;
+                        compressorNode.knee.value = 30;
+                        compressorNode.ratio.value = 6;
+                        compressorNode.attack.value = 0.01;
+                        compressorNode.release.value = 0.5;
+                        micSource.connect(compressorNode);
+                        compressorNode.connect(mediaStreamDestination);
+                    } else {
+                        micSource.connect(mediaStreamDestination);
+                    }
+
+                    tracks.push(mediaStreamDestination.stream.getAudioTracks()[0]);
                 } else if (tabAudioTracks.length > 0) {
                     tracks.push(tabAudioTracks[0]);
                 } else if (micAudioTracks.length > 0) {
