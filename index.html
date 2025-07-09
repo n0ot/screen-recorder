@@ -164,12 +164,13 @@
                 if (element.checked) {
                     // Enable compressor
                     if (!compressorNode) {
+                        // More gentle compression settings to be less reactive to constant background noise
                         compressorNode = audioContext.createDynamicsCompressor();
-                        compressorNode.threshold.value = -30;
+                        compressorNode.threshold.value = -24; // Only compress louder sounds
                         compressorNode.knee.value = 30;
-                        compressorNode.ratio.value = 6;
-                        compressorNode.attack.value = 0.01;
-                        compressorNode.release.value = 0.5;
+                        compressorNode.ratio.value = 4; // Compress less aggressively
+                        compressorNode.attack.value = 0.05; // Slower attack to preserve transients
+                        compressorNode.release.value = 0.25; // Faster release to recover from background noise
                     }
                     micSource.disconnect();
                     micSource.connect(compressorNode);
@@ -252,12 +253,13 @@
                     micSource = audioContext.createMediaStreamSource(new MediaStream([micAudioTracks[0]]));
 
                     if (autoGainCheckbox.checked) {
+                        // More gentle compression settings to be less reactive to constant background noise
                         compressorNode = audioContext.createDynamicsCompressor();
-                        compressorNode.threshold.value = -30;
+                        compressorNode.threshold.value = -24; // Only compress louder sounds
                         compressorNode.knee.value = 30;
-                        compressorNode.ratio.value = 6;
-                        compressorNode.attack.value = 0.01;
-                        compressorNode.release.value = 0.5;
+                        compressorNode.ratio.value = 4; // Compress less aggressively
+                        compressorNode.attack.value = 0.05; // Slower attack to preserve transients
+                        compressorNode.release.value = 0.25; // Faster release to recover from background noise
                         micSource.connect(compressorNode);
                         compressorNode.connect(mediaStreamDestination);
                     } else {
