@@ -34,23 +34,22 @@
 </head>
 <body>
     <h1>Local Screen Recorder</h1>
-    <button id="requestMicButton">Grant Microphone Access</button>
-    <div id="recorderControls" style="display: none; text-align: center; width: 100%;">
+    <div id="recorderControls" style="text-align: center; width: 100%;">
         <div class="controls">
-            <button id="startButton">Start Recording</button>
-            <button id="pauseButton" disabled>Pause</button>
-            <button id="resumeButton" disabled>Resume</button>
-            <button id="stopButton" disabled>Stop Recording</button>
+            <button id="startButton" title="Start Recording (Alt+R)">Start Recording</button>
+            <button id="pauseButton" disabled style="display: none;" title="Pause Recording (Alt+P)">Pause</button>
+            <button id="resumeButton" disabled style="display: none;" title="Resume Recording (Alt+P)">Resume</button>
+            <button id="stopButton" disabled style="display: none;" title="Stop Recording (Alt+S)">Stop Recording</button>
         </div>
-        <div class="mic-controls" style="margin-top: 10px; display: inline-flex; align-items: center; gap: 10px;">
-            <button id="micMuteButton" disabled>Mute Mic</button>
+        <div id="micControls" class="mic-controls" style="margin-top: 10px; display: none; align-items: center; gap: 10px;">
+            <button id="micMuteButton" disabled title="Mute/Unmute Mic (Alt+M)">Mute Mic</button>
             <button id="micSettingsButton">Microphone Settings</button>
         </div>
     </div>
 
     <div id="micSettingsDialog" class="modal">
       <div class="modal-content">
-        <span id="closeMicSettings" class="close-button">&times;</span>
+        <span id="closeMicSettings" class="close-button" role="button" aria-label="Close">&times;</span>
         <h2>Microphone Settings</h2>
         <div style="margin-bottom: 15px;">
             <label for="audioDeviceSelect">Microphone: </label>
@@ -79,8 +78,8 @@
         const videoPreview = document.getElementById('videoPreview');
         const audioDeviceSelect = document.getElementById('audioDeviceSelect');
         const micMuteButton = document.getElementById('micMuteButton');
-        const requestMicButton = document.getElementById('requestMicButton');
         const recorderControls = document.getElementById('recorderControls');
+        const micControls = document.getElementById('micControls');
         const micSettingsButton = document.getElementById('micSettingsButton');
         const micSettingsDialog = document.getElementById('micSettingsDialog');
         const closeMicSettings = document.getElementById('closeMicSettings');
@@ -99,6 +98,7 @@
         let compressorNode;
         let mediaStreamDestination;
         let isMicMuted = false;
+        let hasMicAccess = false;
 
         // Function to update button states
         function updateButtons(recording = false, paused = false) {
@@ -111,9 +111,6 @@
             audioDeviceSelect.disabled = recording;
         }
 
-        // Initial button state
-        updateButtons(false);
-
         micSettingsButton.addEventListener('click', () => {
             micSettingsDialog.style.display = 'block';
         });
@@ -125,30 +122,6 @@
         window.addEventListener('click', (event) => {
             if (event.target == micSettingsDialog) {
                 micSettingsDialog.style.display = 'none';
-            }
-        });
-
-        requestMicButton.addEventListener('click', async () => {
-            requestMicButton.disabled = true;
-            statusDiv.textContent = 'Requesting microphone access...';
-            try {
-                // Request access to get the device list with labels
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                // We don't need this stream now, so stop it.
-                stream.getTracks().forEach(track => track.stop());
-
-                await populateAudioDevices();
-                // Listen for device changes from now on
-                navigator.mediaDevices.ondevicechange = populateAudioDevices;
-
-                requestMicButton.style.display = 'none';
-                recorderControls.style.display = 'block';
-                statusDiv.textContent = 'Ready. Select your microphone and start recording.';
-                micMuteButton.disabled = false;
-            } catch (err) {
-                console.error('Error getting microphone permission:', err);
-                statusDiv.textContent = `Could not get microphone permission: ${err.name}. Please check your browser settings.`;
-                requestMicButton.disabled = false;
             }
         });
 
@@ -250,11 +223,37 @@
         echoCancellationCheckbox.addEventListener('change', (e) => applyAudioConstraint('echoCancellation', e.target));
 
         startButton.addEventListener('click', async () => {
+            // Step 1: Get microphone permissions if we haven't already.
+            if (!hasMicAccess) {
+                statusDiv.textContent = 'Requesting microphone access...';
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    stream.getTracks().forEach(track => track.stop());
+
+                    await populateAudioDevices();
+                    navigator.mediaDevices.ondevicechange = populateAudioDevices;
+                    
+                    micControls.style.display = 'inline-flex';
+                    micMuteButton.disabled = false;
+                    hasMicAccess = true;
+                } catch (err) {
+                    console.error('Error getting microphone permission:', err);
+                    statusDiv.textContent = `Could not get mic: ${err.name}. Recording will continue without a microphone.`;
+                    // If mic fails, we can still record screen. Populate with 'no mic' option.
+                    await populateAudioDevices();
+                    micControls.style.display = 'inline-flex';
+                    hasMicAccess = true; // Set to true to not ask again this session.
+                }
+            }
+
+            // Step 2: Start the screen recording
             recordedChunks = [];
             micStream = null; // Reset mic stream
             downloadLink.style.display = 'none';
-            statusDiv.textContent = 'Awaiting permission...';
+            statusDiv.textContent = 'Awaiting screen selection...';
             videoPreview.style.display = 'none';
+            videoPreview.controls = false;
+            videoPreview.muted = true;
 
             try {
                 const selectedAudioDeviceId = audioDeviceSelect.value;
@@ -368,22 +367,35 @@
                     videoPreview.autoplay = false;
                     videoPreview.controls = true;
                     updateButtons(false);
+
+                    startButton.style.display = 'inline-block';
+                    stopButton.style.display = 'none';
+                    pauseButton.style.display = 'none';
+                    resumeButton.style.display = 'none';
                 };
 
                 mediaRecorder.onpause = () => {
                     statusDiv.textContent = 'Recording paused.';
                     updateButtons(true, true);
+                    pauseButton.style.display = 'none';
+                    resumeButton.style.display = 'inline-block';
                 };
 
                 mediaRecorder.onresume = () => {
                     statusDiv.textContent = 'Recording resumed.';
                     updateButtons(true, false);
+                    pauseButton.style.display = 'inline-block';
+                    resumeButton.style.display = 'none';
                 };
 
                 mediaRecorder.start();
                 statusDiv.textContent = 'Recording...';
                 micMuteButton.textContent = 'Mute Mic';
                 updateButtons(true, false);
+
+                startButton.style.display = 'none';
+                stopButton.style.display = 'inline-block';
+                pauseButton.style.display = 'inline-block';
 
             } catch (err) {
                 console.error('Error starting recording:', err);
@@ -397,6 +409,10 @@
                 }
                 statusDiv.textContent = message;
                 updateButtons(false);
+                startButton.style.display = 'inline-block';
+                stopButton.style.display = 'none';
+                pauseButton.style.display = 'none';
+                resumeButton.style.display = 'none';
                 // Also clean up any partial streams
                 if (displayStream) displayStream.getTracks().forEach(track => track.stop());
                 if (micStream) micStream.getTracks().forEach(track => track.stop());
@@ -418,6 +434,80 @@
         stopButton.addEventListener('click', () => {
             if (mediaRecorder && mediaRecorder.state !== 'inactive') {
                 mediaRecorder.stop();
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            // Modal shortcuts
+            if (e.key === 'Escape' && micSettingsDialog.style.display === 'block') {
+                micSettingsDialog.style.display = 'none';
+                return;
+            }
+
+            // Playback shortcuts (only when video is visible and has a source)
+            if (videoPreview.src && videoPreview.style.display !== 'none' && videoPreview.controls) {
+                 if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT' || document.activeElement.tagName === 'TEXTAREA') {
+                    return; // Don't interfere with typing in inputs
+                }
+
+                let playbackHandled = true;
+                switch (e.key) {
+                    case ' ': // play/pause
+                        if (videoPreview.paused) videoPreview.play();
+                        else videoPreview.pause();
+                        break;
+                    case 'ArrowLeft':
+                        videoPreview.currentTime = Math.max(0, videoPreview.currentTime - 5);
+                        break;
+                    case 'ArrowRight':
+                        videoPreview.currentTime = Math.min(videoPreview.duration, videoPreview.currentTime + 5);
+                        break;
+                    case 'ArrowUp':
+                        videoPreview.volume = Math.min(1, videoPreview.volume + 0.1);
+                        break;
+                    case 'ArrowDown':
+                        videoPreview.volume = Math.max(0, videoPreview.volume - 0.1);
+                        break;
+                    case '<':
+                    case ',':
+                        videoPreview.playbackRate = Math.max(0.25, videoPreview.playbackRate - 0.25);
+                        break;
+                    case '>':
+                    case '.':
+                        videoPreview.playbackRate = Math.min(2, videoPreview.playbackRate + 0.25);
+                        break;
+                    default:
+                        playbackHandled = false;
+                }
+                if (playbackHandled) {
+                    e.preventDefault();
+                    return; // Stop further processing
+                }
+            }
+
+            // Global control shortcuts (using Alt to avoid conflicts)
+            if (e.altKey) {
+                let controlHandled = true;
+                switch (e.key.toLowerCase()) {
+                    case 'r':
+                        if (!startButton.disabled) startButton.click();
+                        break;
+                    case 's':
+                        if (!stopButton.disabled) stopButton.click();
+                        break;
+                    case 'p':
+                        if (!pauseButton.disabled) pauseButton.click();
+                        else if (!resumeButton.disabled) resumeButton.click();
+                        break;
+                    case 'm':
+                        if (!micMuteButton.disabled) micMuteButton.click();
+                        break;
+                    default:
+                        controlHandled = false;
+                }
+                if (controlHandled) {
+                    e.preventDefault();
+                }
             }
         });
     </script>
