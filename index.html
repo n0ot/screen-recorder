@@ -66,7 +66,7 @@
     </div>
 
     <video id="videoPreview" autoplay muted></video>
-    <a id="downloadLink" href="#" download="my-screen-recording.webm">Download Video</a>
+    <a id="downloadLink" href="#" download="my-screen-recording.webm">Save Recording</a>
     <p id="status"></p>
 
     <script>
@@ -125,8 +125,29 @@
         }
 
         newRecordingButton.addEventListener('click', async () => {
-            if (hasMicAccess) return;
+            if (downloadLink.style.display === 'block') {
+                if (!confirm('Starting a new recording will discard the current one if it is not saved. Are you sure?')) {
+                    return;
+                }
+                // User confirmed, so clean up old recording UI before proceeding
+                downloadLink.style.display = 'none';
+                videoPreview.style.display = 'none';
+                videoPreview.srcObject = null;
+                videoPreview.src = '';
+            }
 
+            if (hasMicAccess) {
+                // We already have permissions, just show the controls
+                newRecordingButton.style.display = 'none';
+                recorderControls.style.display = 'block';
+                startButton.style.display = 'inline-block';
+                stopButton.style.display = 'none';
+                pauseButton.style.display = 'none';
+                resumeButton.style.display = 'none';
+                statusDiv.textContent = 'Ready to record. Adjust settings then click Start Recording.';
+                return;
+            }
+            
             newRecordingButton.style.display = 'none';
             recorderControls.style.display = 'block';
             statusDiv.textContent = 'Requesting microphone access...';
@@ -365,7 +386,7 @@
                     const url = URL.createObjectURL(blob);
                     downloadLink.href = url;
                     downloadLink.style.display = 'block';
-                    statusDiv.textContent = 'Recording finished. Watch below or click to download.';
+                    statusDiv.textContent = 'Recording finished. Watch below or click to save.';
 
                     // Stop all tracks from all streams
                     displayStream.getTracks().forEach(track => track.stop());
@@ -382,12 +403,9 @@
                     videoPreview.muted = false;
                     videoPreview.autoplay = false;
                     videoPreview.controls = true;
-                    updateButtons(false);
-
-                    startButton.style.display = 'inline-block';
-                    stopButton.style.display = 'none';
-                    pauseButton.style.display = 'none';
-                    resumeButton.style.display = 'none';
+                    
+                    recorderControls.style.display = 'none';
+                    newRecordingButton.style.display = 'inline-block';
                 };
 
                 mediaRecorder.onpause = () => {
