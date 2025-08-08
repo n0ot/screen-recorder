@@ -24,6 +24,12 @@
         #requestMicButton:hover { background-color: #007bb5; }
         #audioProcessingControls label { cursor: pointer; user-select: none; }
         #audioProcessingControls input { vertical-align: middle; margin-right: 5px; }
+        .modal { display: none; position: fixed; z-index: 1; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4); }
+        .modal-content { background-color: #fefefe; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 500px; border-radius: 10px; }
+        .close-button { color: #aaa; float: right; font-size: 28px; font-weight: bold; }
+        .close-button:hover, .close-button:focus { color: black; text-decoration: none; cursor: pointer; }
+        #micSettingsButton { background-color: #008CBA; color: white; border: none; cursor: pointer; }
+        #micSettingsButton:hover { background-color: #007bb5; }
     </style>
 </head>
 <body>
@@ -37,15 +43,28 @@
             <button id="stopButton" disabled>Stop Recording</button>
         </div>
         <div class="mic-controls" style="margin-top: 10px; display: inline-flex; align-items: center; gap: 10px;">
-            <select id="audioDeviceSelect" title="Select microphone"></select>
             <button id="micMuteButton" disabled>Mute Mic</button>
-        </div>
-        <div id="audioProcessingControls" style="margin-top: 10px; font-size: 0.9em;">
-            <label style="margin-right: 15px;"><input type="checkbox" id="autoGainCheckbox" checked> Auto Gain Control</label>
-            <label style="margin-right: 15px;"><input type="checkbox" id="noiseSuppressionCheckbox" checked> Noise Suppression</label>
-            <label><input type="checkbox" id="echoCancellationCheckbox" checked> Echo Cancellation</label>
+            <button id="micSettingsButton">Microphone Settings</button>
         </div>
     </div>
+
+    <div id="micSettingsDialog" class="modal">
+      <div class="modal-content">
+        <span id="closeMicSettings" class="close-button">&times;</span>
+        <h2>Microphone Settings</h2>
+        <div style="margin-bottom: 15px;">
+            <label for="audioDeviceSelect">Microphone: </label>
+            <select id="audioDeviceSelect" title="Select microphone"></select>
+        </div>
+        <div id="audioProcessingControls" style="font-size: 0.9em;">
+            <p>Audio Enhancements:</p>
+            <label style="display: block; margin-bottom: 5px;"><input type="checkbox" id="autoGainCheckbox" checked> Auto Gain Control</label>
+            <label style="display: block; margin-bottom: 5px;"><input type="checkbox" id="noiseSuppressionCheckbox" checked> Noise Suppression</label>
+            <label style="display: block;"><input type="checkbox" id="echoCancellationCheckbox" checked> Echo Cancellation</label>
+        </div>
+      </div>
+    </div>
+
     <video id="videoPreview" autoplay muted></video>
     <a id="downloadLink" href="#" download="my-screen-recording.webm">Download Video</a>
     <p id="status"></p>
@@ -62,6 +81,9 @@
         const micMuteButton = document.getElementById('micMuteButton');
         const requestMicButton = document.getElementById('requestMicButton');
         const recorderControls = document.getElementById('recorderControls');
+        const micSettingsButton = document.getElementById('micSettingsButton');
+        const micSettingsDialog = document.getElementById('micSettingsDialog');
+        const closeMicSettings = document.getElementById('closeMicSettings');
         const autoGainCheckbox = document.getElementById('autoGainCheckbox');
         const noiseSuppressionCheckbox = document.getElementById('noiseSuppressionCheckbox');
         const echoCancellationCheckbox = document.getElementById('echoCancellationCheckbox');
@@ -76,6 +98,7 @@
         let gainNode;
         let compressorNode;
         let mediaStreamDestination;
+        let isMicMuted = false;
 
         // Function to update button states
         function updateButtons(recording = false, paused = false) {
@@ -83,12 +106,27 @@
             stopButton.disabled = !recording;
             pauseButton.disabled = !recording || paused;
             resumeButton.disabled = !recording || !paused;
-            micMuteButton.disabled = !recording || !micStream; // Disable if no mic stream
+            // micMuteButton is enabled once mic access is granted.
+            micSettingsButton.disabled = recording;
             audioDeviceSelect.disabled = recording;
         }
 
         // Initial button state
         updateButtons(false);
+
+        micSettingsButton.addEventListener('click', () => {
+            micSettingsDialog.style.display = 'block';
+        });
+
+        closeMicSettings.addEventListener('click', () => {
+            micSettingsDialog.style.display = 'none';
+        });
+
+        window.addEventListener('click', (event) => {
+            if (event.target == micSettingsDialog) {
+                micSettingsDialog.style.display = 'none';
+            }
+        });
 
         requestMicButton.addEventListener('click', async () => {
             requestMicButton.disabled = true;
@@ -106,6 +144,7 @@
                 requestMicButton.style.display = 'none';
                 recorderControls.style.display = 'block';
                 statusDiv.textContent = 'Ready. Select your microphone and start recording.';
+                micMuteButton.disabled = false;
             } catch (err) {
                 console.error('Error getting microphone permission:', err);
                 statusDiv.textContent = `Could not get microphone permission: ${err.name}. Please check your browser settings.`;
@@ -134,9 +173,11 @@
                 noMicOption.text = 'No Microphone';
                 audioDeviceSelect.appendChild(noMicOption);
                 
-                // Restore selection if possible, otherwise default to 'none'
-                if (Array.from(audioDeviceSelect.options).some(o => o.value === currentSelection)) {
+                // Restore selection if possible, otherwise default to the first device
+                if (Array.from(audioDeviceSelect.options).some(o => o.value === currentSelection) && currentSelection) {
                     audioDeviceSelect.value = currentSelection;
+                } else if (audioDevices.length > 0) {
+                    audioDeviceSelect.value = audioDevices[0].deviceId;
                 } else {
                     audioDeviceSelect.value = 'none';
                 }
@@ -149,11 +190,12 @@
         
 
         micMuteButton.addEventListener('click', () => {
-            if (!micStream) return;
-            const micTrack = micStream.getAudioTracks()[0];
-            if (micTrack) {
-                micTrack.enabled = !micTrack.enabled;
-                micMuteButton.textContent = micTrack.enabled ? 'Mute Mic' : 'Unmute Mic';
+            isMicMuted = !isMicMuted;
+            micMuteButton.textContent = isMicMuted ? 'Unmute Mic' : 'Mute Mic';
+
+            // If recording is active, apply immediately
+            if (micStream && micStream.getAudioTracks().length > 0) {
+                micStream.getAudioTracks()[0].enabled = !isMicMuted;
             }
         });
 
@@ -225,6 +267,9 @@
                             echoCancellation: echoCancellationCheckbox.checked
                         }
                     });
+                    if (micStream) {
+                        micStream.getAudioTracks()[0].enabled = !isMicMuted;
+                    }
                 }
 
                 // Get screen and tab audio
@@ -316,6 +361,7 @@
                         audioContext.close();
                     }
 
+                    videoPreview.style.display = 'block';
                     videoPreview.srcObject = null; // Stop the live preview
                     videoPreview.src = url;
                     videoPreview.muted = false;
