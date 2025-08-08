@@ -305,7 +305,7 @@
                     const url = URL.createObjectURL(blob);
                     downloadLink.href = url;
                     downloadLink.style.display = 'block';
-                    statusDiv.textContent = 'Recording finished. Click to download.';
+                    statusDiv.textContent = 'Recording finished. Watch below or click to download.';
 
                     // Stop all tracks from all streams
                     displayStream.getTracks().forEach(track => track.stop());
@@ -316,7 +316,11 @@
                         audioContext.close();
                     }
 
-                    videoPreview.srcObject = null;
+                    videoPreview.srcObject = null; // Stop the live preview
+                    videoPreview.src = url;
+                    videoPreview.muted = false;
+                    videoPreview.autoplay = false;
+                    videoPreview.controls = true;
                     updateButtons(false);
                 };
 
