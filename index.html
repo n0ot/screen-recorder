@@ -467,8 +467,9 @@
                 }
 
                 let playbackHandled = true;
-                switch (e.key) {
-                    case ' ': // play/pause
+                // Use e.code to make shortcuts independent of keyboard layout and modifiers (like Shift)
+                switch (e.code) {
+                    case 'Space': // play/pause
                         if (videoPreview.paused) videoPreview.play();
                         else videoPreview.pause();
                         break;
@@ -484,12 +485,10 @@
                     case 'ArrowDown':
                         videoPreview.volume = Math.max(0, videoPreview.volume - 0.1);
                         break;
-                    case '<':
-                    case ',':
+                    case 'Comma': // Corresponds to '<' or ',' key
                         videoPreview.playbackRate = Math.max(0.25, videoPreview.playbackRate - 0.25);
                         break;
-                    case '>':
-                    case '.':
+                    case 'Period': // Corresponds to '>' or '.' key
                         videoPreview.playbackRate = Math.min(2, videoPreview.playbackRate + 0.25);
                         break;
                     default:
