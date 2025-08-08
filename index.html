@@ -34,7 +34,8 @@
 </head>
 <body>
     <h1>Local Screen Recorder</h1>
-    <div id="recorderControls" style="text-align: center; width: 100%;">
+    <button id="newRecordingButton" style="padding: 12px 24px; font-size: 1.1em; cursor: pointer; border: none; border-radius: 5px; background-color: #4CAF50; color: white;" title="Set up a new recording (Alt+R)">New Recording</button>
+    <div id="recorderControls" style="display: none; text-align: center; width: 100%;">
         <div class="controls">
             <button id="startButton" title="Start Recording (Alt+R)">Start Recording</button>
             <button id="pauseButton" disabled style="display: none;" title="Pause Recording (Alt+P)">Pause</button>
@@ -69,6 +70,7 @@
     <p id="status"></p>
 
     <script>
+        const newRecordingButton = document.getElementById('newRecordingButton');
         const startButton = document.getElementById('startButton');
         const stopButton = document.getElementById('stopButton');
         const pauseButton = document.getElementById('pauseButton');
@@ -110,6 +112,32 @@
             micSettingsButton.disabled = recording;
             audioDeviceSelect.disabled = recording;
         }
+
+        newRecordingButton.addEventListener('click', async () => {
+            if (hasMicAccess) return;
+
+            newRecordingButton.style.display = 'none';
+            recorderControls.style.display = 'block';
+            statusDiv.textContent = 'Requesting microphone access...';
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                stream.getTracks().forEach(track => track.stop());
+
+                await populateAudioDevices();
+                navigator.mediaDevices.ondevicechange = populateAudioDevices;
+            
+                micControls.style.display = 'inline-flex';
+                micMuteButton.disabled = false;
+                hasMicAccess = true;
+                statusDiv.textContent = 'Ready to record. Adjust settings then click Start Recording.';
+            } catch (err) {
+                console.error('Error getting microphone permission:', err);
+                await populateAudioDevices();
+                micControls.style.display = 'inline-flex';
+                hasMicAccess = true; // Set to true to not ask again this session.
+                statusDiv.textContent = `Could not get mic: ${err.name}. You can still record your screen.`;
+            }
+        });
 
         micSettingsButton.addEventListener('click', () => {
             micSettingsDialog.style.display = 'block';
@@ -223,30 +251,7 @@
         echoCancellationCheckbox.addEventListener('change', (e) => applyAudioConstraint('echoCancellation', e.target));
 
         startButton.addEventListener('click', async () => {
-            // Step 1: Get microphone permissions if we haven't already.
-            if (!hasMicAccess) {
-                statusDiv.textContent = 'Requesting microphone access...';
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    stream.getTracks().forEach(track => track.stop());
-
-                    await populateAudioDevices();
-                    navigator.mediaDevices.ondevicechange = populateAudioDevices;
-                    
-                    micControls.style.display = 'inline-flex';
-                    micMuteButton.disabled = false;
-                    hasMicAccess = true;
-                } catch (err) {
-                    console.error('Error getting microphone permission:', err);
-                    statusDiv.textContent = `Could not get mic: ${err.name}. Recording will continue without a microphone.`;
-                    // If mic fails, we can still record screen. Populate with 'no mic' option.
-                    await populateAudioDevices();
-                    micControls.style.display = 'inline-flex';
-                    hasMicAccess = true; // Set to true to not ask again this session.
-                }
-            }
-
-            // Step 2: Start the screen recording
+            // Start the screen recording
             recordedChunks = [];
             micStream = null; // Reset mic stream
             downloadLink.style.display = 'none';
@@ -490,7 +495,11 @@
                 let controlHandled = true;
                 switch (e.key.toLowerCase()) {
                     case 'r':
-                        if (!startButton.disabled) startButton.click();
+                        if (newRecordingButton.style.display !== 'none') {
+                            newRecordingButton.click();
+                        } else if (!startButton.disabled) {
+                            startButton.click();
+                        }
                         break;
                     case 's':
                         if (!stopButton.disabled) stopButton.click();
