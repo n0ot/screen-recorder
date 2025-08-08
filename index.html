@@ -34,16 +34,16 @@
 </head>
 <body>
     <h1>Local Screen Recorder</h1>
-    <button id="newRecordingButton" style="padding: 12px 24px; font-size: 1.1em; cursor: pointer; border: none; border-radius: 5px; background-color: #4CAF50; color: white;" title="Set up a new recording (Alt+R)">New Recording</button>
+    <button id="newRecordingButton" style="padding: 12px 24px; font-size: 1.1em; cursor: pointer; border: none; border-radius: 5px; background-color: #4CAF50; color: white;" title="Set up a new recording">New Recording</button>
     <div id="recorderControls" style="display: none; text-align: center; width: 100%;">
         <div class="controls">
-            <button id="startButton" title="Start Recording (Alt+R)">Start Recording</button>
-            <button id="pauseButton" disabled style="display: none;" title="Pause Recording (Alt+P)">Pause</button>
-            <button id="resumeButton" disabled style="display: none;" title="Resume Recording (Alt+P)">Resume</button>
-            <button id="stopButton" disabled style="display: none;" title="Stop Recording (Alt+S)">Stop Recording</button>
+            <button id="startButton" title="Start Recording">Start Recording</button>
+            <button id="pauseButton" disabled style="display: none;" title="Pause Recording">Pause</button>
+            <button id="resumeButton" disabled style="display: none;" title="Resume Recording">Resume</button>
+            <button id="stopButton" disabled style="display: none;" title="Stop Recording">Stop Recording</button>
         </div>
         <div id="micControls" class="mic-controls" style="margin-top: 10px; display: none; align-items: center; gap: 10px;">
-            <button id="micMuteButton" disabled title="Mute/Unmute Mic (Alt+M)">Mute Mic</button>
+            <button id="micMuteButton" disabled title="Mute/Unmute Mic">Mute Mic</button>
             <button id="micSettingsButton">Microphone Settings</button>
         </div>
     </div>
@@ -101,6 +101,17 @@
         let mediaStreamDestination;
         let isMicMuted = false;
         let hasMicAccess = false;
+
+        // --- UI & Shortcut setup ---
+        const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+        const modifierKey = isMac ? 'Option' : 'Alt';
+        newRecordingButton.title = `Set up a new recording (${modifierKey}+R)`;
+        startButton.title = `Start Recording (${modifierKey}+R)`;
+        pauseButton.title = `Pause Recording (${modifierKey}+P)`;
+        resumeButton.title = `Resume Recording (${modifierKey}+P)`;
+        stopButton.title = `Stop Recording (${modifierKey}+S)`;
+        micMuteButton.title = `Mute/Unmute Mic (${modifierKey}+M)`;
+        // --- End of UI & Shortcut setup ---
 
         // Function to update button states
         function updateButtons(recording = false, paused = false) {
@@ -493,22 +504,22 @@
             // Global control shortcuts (using Alt to avoid conflicts)
             if (e.altKey) {
                 let controlHandled = true;
-                switch (e.key.toLowerCase()) {
-                    case 'r':
+                switch (e.code) {
+                    case 'KeyR':
                         if (newRecordingButton.style.display !== 'none') {
                             newRecordingButton.click();
                         } else if (!startButton.disabled) {
                             startButton.click();
                         }
                         break;
-                    case 's':
+                    case 'KeyS':
                         if (!stopButton.disabled) stopButton.click();
                         break;
-                    case 'p':
+                    case 'KeyP':
                         if (!pauseButton.disabled) pauseButton.click();
                         else if (!resumeButton.disabled) resumeButton.click();
                         break;
-                    case 'm':
+                    case 'KeyM':
                         if (!micMuteButton.disabled) micMuteButton.click();
                         break;
                     default:
