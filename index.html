@@ -506,6 +506,13 @@
         changeSourceButton.addEventListener('click', async () => {
             if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
 
+            const oldVideoTrack = displayStream.getVideoTracks()[0];
+            if (!oldVideoTrack) return;
+
+            // Temporarily remove the handler to prevent it from firing during the switch.
+            const originalOnEnded = oldVideoTrack.onended;
+            oldVideoTrack.onended = null;
+
             statusDiv.textContent = 'Awaiting new screen selection...';
             try {
                 const newDisplayStream = await navigator.mediaDevices.getDisplayMedia({
@@ -515,39 +522,32 @@
 
                 // --- Video track replacement ---
                 const newVideoTrack = newDisplayStream.getVideoTracks()[0];
-                const oldVideoTrack = mixedStream.getVideoTracks()[0];
-                
-                // Remove the 'onended' handler from the old track before stopping it
-                // to prevent it from triggering a premature end to the recording.
-                if (oldVideoTrack) {
-                    oldVideoTrack.onended = null;
-                }
                 
                 mixedStream.removeTrack(oldVideoTrack);
                 mixedStream.addTrack(newVideoTrack);
                 
-                // Stop old stream tracks and update the reference
+                // Cleanly stop all tracks of the old stream object and update our reference.
                 displayStream.getTracks().forEach(track => track.stop());
                 displayStream = newDisplayStream;
 
-                // Re-run audio setup for new stream
+                // Re-run audio setup for the new stream's audio.
                 await setupAudioMixing();
 
-                // Update the live preview
+                // Update the live preview.
                 videoPreview.srcObject = newDisplayStream;
 
-                // When the user stops sharing the new source, stop the recording
-                newVideoTrack.onended = () => {
-                    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                        stopButton.click();
-                    }
-                };
+                // Attach the original 'onended' handler logic to the new track.
+                newVideoTrack.onended = originalOnEnded;
 
                 statusDiv.textContent = 'Recording source updated.';
 
             } catch (err) {
                 console.error('Error changing screen source:', err);
                 statusDiv.textContent = 'Could not change source: ' + err.message;
+                // If the operation was cancelled or failed, restore the handler on the original track.
+                if (oldVideoTrack.readyState === 'live') {
+                    oldVideoTrack.onended = originalOnEnded;
+                }
             }
         });
 
