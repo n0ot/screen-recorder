@@ -11,6 +11,9 @@
         #startButton:hover { background-color: #45a049; }
         #stopButton { background-color: #f44336; color: white; }
         #stopButton:hover { background-color: #da190b; }
+        #changeSourceButton { background-color: #2196F3; color: white; } /* Blue */
+        #changeSourceButton:hover:not(:disabled) { background-color: #0b7dda; }
+        #changeSourceButton:disabled { background-color: #9e9e9e; cursor: not-allowed; }
         #pauseButton, #resumeButton { background-color: #008CBA; color: white; }
         #pauseButton:hover, #resumeButton:hover { background-color: #007bb5; }
         #downloadLink { display: none; margin-top: 20px; padding: 10px 20px; background-color: #555; color: white; text-decoration: none; border-radius: 5px; }
@@ -41,6 +44,7 @@
             <button id="pauseButton" disabled style="display: none;" title="Pause Recording">Pause</button>
             <button id="resumeButton" disabled style="display: none;" title="Resume Recording">Resume</button>
             <button id="stopButton" disabled style="display: none;" title="Stop Recording">Stop Recording</button>
+            <button id="changeSourceButton" disabled style="display: none;" title="Change Screen/Tab">Change Source</button>
         </div>
         <div id="micControls" class="mic-controls" style="margin-top: 10px; display: none; align-items: center; gap: 10px;">
             <button id="micMuteButton" disabled title="Mute/Unmute Mic">Mute Mic</button>
@@ -75,6 +79,7 @@
         const stopButton = document.getElementById('stopButton');
         const pauseButton = document.getElementById('pauseButton');
         const resumeButton = document.getElementById('resumeButton');
+        const changeSourceButton = document.getElementById('changeSourceButton');
         const downloadLink = document.getElementById('downloadLink');
         const statusDiv = document.getElementById('status');
         const videoPreview = document.getElementById('videoPreview');
@@ -113,10 +118,65 @@
         micMuteButton.title = `Mute/Unmute Mic (${modifierKey}+M)`;
         // --- End of UI & Shortcut setup ---
 
+        async function setupAudioMixing() {
+            // Clean up existing audio context if it exists, as we are rebuilding the audio pipeline
+            if (audioContext) {
+                audioContext.close().catch(e => console.error("Error closing previous audio context:", e));
+                audioContext = null;
+            }
+
+            // Remove any existing audio track from the mixed stream before adding a new one.
+            const existingAudioTracks = mixedStream.getAudioTracks();
+            existingAudioTracks.forEach(track => mixedStream.removeTrack(track));
+
+            const tabAudioTracks = displayStream.getAudioTracks();
+            const micAudioTracks = micStream ? micStream.getAudioTracks() : [];
+            let finalAudioTrack = null;
+
+            if (micAudioTracks.length > 0 && tabAudioTracks.length > 0) {
+                audioContext = new AudioContext();
+                mediaStreamDestination = audioContext.createMediaStreamDestination();
+                
+                const tabSource = audioContext.createMediaStreamSource(new MediaStream([tabAudioTracks[0]]));
+                const tabGainNode = audioContext.createGain();
+                tabGainNode.gain.value = 0.7; // Reduce tab audio to make mic more prominent
+                tabSource.connect(tabGainNode);
+                tabGainNode.connect(mediaStreamDestination);
+
+                micSource = audioContext.createMediaStreamSource(new MediaStream([micAudioTracks[0]]));
+                gainNode = audioContext.createGain();
+                gainNode.gain.value = 1.5; // Boost microphone volume
+                micSource.connect(gainNode);
+
+                if (autoGainCheckbox.checked) {
+                    compressorNode = audioContext.createDynamicsCompressor();
+                    compressorNode.threshold.value = -50;
+                    compressorNode.knee.value = 40;
+                    compressorNode.ratio.value = 12;
+                    compressorNode.attack.value = 0.01;
+                    compressorNode.release.value = 0.25;
+                    gainNode.connect(compressorNode);
+                    compressorNode.connect(mediaStreamDestination);
+                } else {
+                    gainNode.connect(mediaStreamDestination);
+                }
+                finalAudioTrack = mediaStreamDestination.stream.getAudioTracks()[0];
+            } else if (tabAudioTracks.length > 0) {
+                finalAudioTrack = tabAudioTracks[0];
+            } else if (micAudioTracks.length > 0) {
+                finalAudioTrack = micAudioTracks[0];
+            }
+
+            if (finalAudioTrack) {
+                mixedStream.addTrack(finalAudioTrack);
+            }
+        }
+
         // Function to update button states
         function updateButtons(recording = false, paused = false) {
             startButton.disabled = recording;
             stopButton.disabled = !recording;
+            changeSourceButton.disabled = !recording;
             pauseButton.disabled = !recording || paused;
             resumeButton.disabled = !recording || !paused;
             // micMuteButton is enabled once mic access is granted.
@@ -144,6 +204,7 @@
                 stopButton.style.display = 'none';
                 pauseButton.style.display = 'none';
                 resumeButton.style.display = 'none';
+                changeSourceButton.style.display = 'none';
                 statusDiv.textContent = 'Ready to record. Adjust settings then click Start Recording.';
                 updateButtons(false);
                 return;
@@ -324,47 +385,15 @@
                 });
                 
                 const tracks = [...displayStream.getVideoTracks()];
-                const tabAudioTracks = displayStream.getAudioTracks();
-                const micAudioTracks = micStream ? micStream.getAudioTracks() : [];
-
-                if (micAudioTracks.length > 0 && tabAudioTracks.length > 0) {
-                    audioContext = new AudioContext();
-                    mediaStreamDestination = audioContext.createMediaStreamDestination();
-                    
-                    const tabSource = audioContext.createMediaStreamSource(new MediaStream([tabAudioTracks[0]]));
-                    const tabGainNode = audioContext.createGain();
-                    tabGainNode.gain.value = 0.7; // Reduce tab audio volume to 70% to make mic more prominent
-                    tabSource.connect(tabGainNode);
-                    tabGainNode.connect(mediaStreamDestination);
-
-                    micSource = audioContext.createMediaStreamSource(new MediaStream([micAudioTracks[0]]));
-                    gainNode = audioContext.createGain();
-                    gainNode.gain.value = 1.5; // Boost microphone volume by 50%
-                    micSource.connect(gainNode);
-
-                    if (autoGainCheckbox.checked) {
-                        // Settings for a vocal leveler/compressor. This provides AGC.
-                        // It keeps the voice level consistent, even when moving away from the mic.
-                        compressorNode = audioContext.createDynamicsCompressor();
-                        compressorNode.threshold.value = -50; // Start compressing even at low volumes
-                        compressorNode.knee.value = 40;      // Soft knee for a gradual, less noticeable effect
-                        compressorNode.ratio.value = 12;     // A common ratio for leveling vocals
-                        compressorNode.attack.value = 0.01;  // Faster attack to catch sounds quickly
-                        compressorNode.release.value = 0.25; // Standard release time
-                        gainNode.connect(compressorNode);
-                        compressorNode.connect(mediaStreamDestination);
-                    } else {
-                        gainNode.connect(mediaStreamDestination);
-                    }
-
-                    tracks.push(mediaStreamDestination.stream.getAudioTracks()[0]);
-                } else if (tabAudioTracks.length > 0) {
-                    tracks.push(tabAudioTracks[0]);
-                } else if (micAudioTracks.length > 0) {
-                    tracks.push(micAudioTracks[0]);
-                }
-                
                 mixedStream = new MediaStream(tracks);
+                await setupAudioMixing();
+
+                // When the user stops sharing via the browser's native UI, stop the recording
+                displayStream.getVideoTracks()[0].onended = () => {
+                    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                        stopButton.click();
+                    }
+                };
 
                 // Preview the screen, but without audio to prevent feedback
                 videoPreview.srcObject = displayStream;
@@ -406,6 +435,7 @@
                     videoPreview.controls = true;
                     
                     recorderControls.style.display = 'none';
+                    changeSourceButton.style.display = 'none';
                     newRecordingButton.style.display = 'inline-block';
                 };
 
@@ -431,6 +461,7 @@
                 startButton.style.display = 'none';
                 stopButton.style.display = 'inline-block';
                 pauseButton.style.display = 'inline-block';
+                changeSourceButton.style.display = 'inline-block';
 
             } catch (err) {
                 console.error('Error starting recording:', err);
@@ -469,6 +500,48 @@
         stopButton.addEventListener('click', () => {
             if (mediaRecorder && mediaRecorder.state !== 'inactive') {
                 mediaRecorder.stop();
+            }
+        });
+
+        changeSourceButton.addEventListener('click', async () => {
+            if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
+
+            statusDiv.textContent = 'Awaiting new screen selection...';
+            try {
+                const newDisplayStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { cursor: "always", displaySurface: "browser" },
+                    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+                });
+
+                // --- Video track replacement ---
+                const newVideoTrack = newDisplayStream.getVideoTracks()[0];
+                const oldVideoTrack = mixedStream.getVideoTracks()[0];
+                
+                mixedStream.removeTrack(oldVideoTrack);
+                mixedStream.addTrack(newVideoTrack);
+                
+                // Stop old stream tracks and update the reference
+                displayStream.getTracks().forEach(track => track.stop());
+                displayStream = newDisplayStream;
+
+                // Re-run audio setup for new stream
+                await setupAudioMixing();
+
+                // Update the live preview
+                videoPreview.srcObject = newDisplayStream;
+
+                // When the user stops sharing the new source, stop the recording
+                newVideoTrack.onended = () => {
+                    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                        stopButton.click();
+                    }
+                };
+
+                statusDiv.textContent = 'Recording source updated.';
+
+            } catch (err) {
+                console.error('Error changing screen source:', err);
+                statusDiv.textContent = 'Could not change source: ' + err.message;
             }
         });
 
