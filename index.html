@@ -517,6 +517,12 @@
                 const newVideoTrack = newDisplayStream.getVideoTracks()[0];
                 const oldVideoTrack = mixedStream.getVideoTracks()[0];
                 
+                // Remove the 'onended' handler from the old track before stopping it
+                // to prevent it from triggering a premature end to the recording.
+                if (oldVideoTrack) {
+                    oldVideoTrack.onended = null;
+                }
+                
                 mixedStream.removeTrack(oldVideoTrack);
                 mixedStream.addTrack(newVideoTrack);
                 
