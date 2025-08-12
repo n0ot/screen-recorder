@@ -168,25 +168,33 @@
         }
 
         function updateTabAudioSource(newTabStream) {
-            // Disconnect old tab audio source if it exists
-            if (tabSource) {
-                tabSource.disconnect();
-                tabSource = null;
-            }
-            if (tabGainNode) {
-                tabGainNode.disconnect();
-                tabGainNode = null;
-            }
-            
+            if (!audioContext) return; // Nothing to do if audio isn't initialized
+
+            const oldTabSource = tabSource;
+            const oldTabGainNode = tabGainNode;
+
             const newTabAudioTracks = newTabStream.getAudioTracks();
 
-            // If new stream has audio, create and connect a new source via a gain node
-            if (newTabAudioTracks.length > 0 && audioContext) {
+            // If new stream has audio, create and connect a new source before disconnecting the old one.
+            if (newTabAudioTracks.length > 0) {
                 tabSource = audioContext.createMediaStreamSource(new MediaStream([newTabAudioTracks[0]]));
                 tabGainNode = audioContext.createGain();
                 tabGainNode.gain.value = 0.7; // Reduce tab audio
                 tabSource.connect(tabGainNode);
                 tabGainNode.connect(mediaStreamDestination);
+            } else {
+                // No new audio source.
+                tabSource = null;
+                tabGainNode = null;
+            }
+            
+            // Now that the new source is connected (if any), disconnect the old one.
+            // This ensures the audio context's destination stream doesn't briefly become inactive.
+            if (oldTabSource) {
+                oldTabSource.disconnect();
+            }
+            if (oldTabGainNode) {
+                oldTabGainNode.disconnect();
             }
         }
 
