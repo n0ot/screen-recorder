@@ -526,12 +526,15 @@
                 mixedStream.removeTrack(oldVideoTrack);
                 mixedStream.addTrack(newVideoTrack);
                 
-                // Cleanly stop all tracks of the old stream object and update our reference.
-                displayStream.getTracks().forEach(track => track.stop());
+                const oldDisplayStream = displayStream;
                 displayStream = newDisplayStream;
 
                 // Re-run audio setup for the new stream's audio.
                 await setupAudioMixing();
+
+                // Now that the old display stream's tracks are no longer in mixedStream,
+                // we can safely stop them.
+                oldDisplayStream.getTracks().forEach(track => track.stop());
 
                 // Update the live preview.
                 videoPreview.srcObject = newDisplayStream;
