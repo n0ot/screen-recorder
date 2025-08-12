@@ -118,16 +118,18 @@
         micMuteButton.title = `Mute/Unmute Mic (${modifierKey}+M)`;
         // --- End of UI & Shortcut setup ---
 
-        async function setupAudioMixing() {
-            // Clean up existing audio context if it exists, as we are rebuilding the audio pipeline
-            if (audioContext) {
-                audioContext.close().catch(e => console.error("Error closing previous audio context:", e));
-                audioContext = null;
-            }
+        async function setupAudioMixing(performCleanup = true) {
+            if (performCleanup) {
+                // Clean up existing audio context if it exists, as we are rebuilding the audio pipeline
+                if (audioContext) {
+                    audioContext.close().catch(e => console.error("Error closing previous audio context:", e));
+                    audioContext = null;
+                }
 
-            // Remove any existing audio track from the mixed stream before adding a new one.
-            const existingAudioTracks = mixedStream.getAudioTracks();
-            existingAudioTracks.forEach(track => mixedStream.removeTrack(track));
+                // Remove any existing audio track from the mixed stream before adding a new one.
+                const existingAudioTracks = mixedStream.getAudioTracks();
+                existingAudioTracks.forEach(track => mixedStream.removeTrack(track));
+            }
 
             const tabAudioTracks = displayStream.getAudioTracks();
             const micAudioTracks = micStream ? micStream.getAudioTracks() : [];
@@ -529,8 +531,20 @@
                 const oldDisplayStream = displayStream;
                 displayStream = newDisplayStream;
 
-                // Re-run audio setup for the new stream's audio.
-                await setupAudioMixing();
+                const oldAudioContext = audioContext;
+                const oldAudioTracks = mixedStream.getAudioTracks();
+
+                // Re-run audio setup for the new stream's audio, without cleanup.
+                // This creates a new audio context and adds a new track to the mixed stream.
+                await setupAudioMixing(false);
+
+                // Now that the new audio track is in the mixed stream, we can remove the old ones.
+                oldAudioTracks.forEach(track => mixedStream.removeTrack(track));
+                
+                // It is now safe to close the old audio context.
+                if (oldAudioContext) {
+                    oldAudioContext.close().catch(e => console.error("Error closing old audio context", e));
+                }
 
                 // Now that the old display stream's tracks are no longer in mixedStream,
                 // we can safely stop them.
