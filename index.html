@@ -104,6 +104,8 @@
         let gainNode;
         let compressorNode;
         let mediaStreamDestination;
+        let tabSource;
+        let tabGainNode;
         let isMicMuted = false;
         let hasMicAccess = false;
 
@@ -118,33 +120,19 @@
         micMuteButton.title = `Mute/Unmute Mic (${modifierKey}+M)`;
         // --- End of UI & Shortcut setup ---
 
-        async function setupAudioMixing(performCleanup = true) {
-            if (performCleanup) {
-                // Clean up existing audio context if it exists, as we are rebuilding the audio pipeline
-                if (audioContext) {
-                    audioContext.close().catch(e => console.error("Error closing previous audio context:", e));
-                    audioContext = null;
-                }
-
-                // Remove any existing audio track from the mixed stream before adding a new one.
-                const existingAudioTracks = mixedStream.getAudioTracks();
-                existingAudioTracks.forEach(track => mixedStream.removeTrack(track));
-            }
-
+        async function setupAudioMixing() {
+            // This function is for initial audio setup ONLY. It creates the audio context
+            // and sets up all initial sources. It's called once when a recording starts.
             const tabAudioTracks = displayStream.getAudioTracks();
             const micAudioTracks = micStream ? micStream.getAudioTracks() : [];
-            let finalAudioTrack = null;
+            
+            if (micAudioTracks.length === 0 && tabAudioTracks.length === 0) return; // No audio sources.
 
-            if (micAudioTracks.length > 0 && tabAudioTracks.length > 0) {
-                audioContext = new AudioContext();
-                mediaStreamDestination = audioContext.createMediaStreamDestination();
-                
-                const tabSource = audioContext.createMediaStreamSource(new MediaStream([tabAudioTracks[0]]));
-                const tabGainNode = audioContext.createGain();
-                tabGainNode.gain.value = 0.7; // Reduce tab audio to make mic more prominent
-                tabSource.connect(tabGainNode);
-                tabGainNode.connect(mediaStreamDestination);
+            audioContext = new AudioContext();
+            mediaStreamDestination = audioContext.createMediaStreamDestination();
 
+            // Setup mic source if available
+            if (micAudioTracks.length > 0) {
                 micSource = audioContext.createMediaStreamSource(new MediaStream([micAudioTracks[0]]));
                 gainNode = audioContext.createGain();
                 gainNode.gain.value = 1.5; // Boost microphone volume
@@ -162,15 +150,43 @@
                 } else {
                     gainNode.connect(mediaStreamDestination);
                 }
-                finalAudioTrack = mediaStreamDestination.stream.getAudioTracks()[0];
-            } else if (tabAudioTracks.length > 0) {
-                finalAudioTrack = tabAudioTracks[0];
-            } else if (micAudioTracks.length > 0) {
-                finalAudioTrack = micAudioTracks[0];
             }
 
+            // Setup tab audio source if available
+            if (tabAudioTracks.length > 0) {
+                tabSource = audioContext.createMediaStreamSource(new MediaStream([tabAudioTracks[0]]));
+                tabGainNode = audioContext.createGain();
+                tabGainNode.gain.value = 0.7; // Reduce tab audio
+                tabSource.connect(tabGainNode);
+                tabGainNode.connect(mediaStreamDestination);
+            }
+
+            const finalAudioTrack = mediaStreamDestination.stream.getAudioTracks()[0];
             if (finalAudioTrack) {
                 mixedStream.addTrack(finalAudioTrack);
+            }
+        }
+
+        function updateTabAudioSource(newTabStream) {
+            // Disconnect old tab audio source if it exists
+            if (tabSource) {
+                tabSource.disconnect();
+                tabSource = null;
+            }
+            if (tabGainNode) {
+                tabGainNode.disconnect();
+                tabGainNode = null;
+            }
+            
+            const newTabAudioTracks = newTabStream.getAudioTracks();
+
+            // If new stream has audio, create and connect a new source via a gain node
+            if (newTabAudioTracks.length > 0 && audioContext) {
+                tabSource = audioContext.createMediaStreamSource(new MediaStream([newTabAudioTracks[0]]));
+                tabGainNode = audioContext.createGain();
+                tabGainNode.gain.value = 0.7; // Reduce tab audio
+                tabSource.connect(tabGainNode);
+                tabGainNode.connect(mediaStreamDestination);
             }
         }
 
@@ -427,6 +443,7 @@
                     }
                     if (audioContext) {
                         audioContext.close();
+                        audioContext = null;
                     }
 
                     videoPreview.style.display = 'block';
@@ -524,30 +541,16 @@
 
                 // --- Video track replacement ---
                 const newVideoTrack = newDisplayStream.getVideoTracks()[0];
-                
                 mixedStream.removeTrack(oldVideoTrack);
                 mixedStream.addTrack(newVideoTrack);
                 
+                // --- Audio source replacement (within the same AudioContext) ---
+                updateTabAudioSource(newDisplayStream);
+
                 const oldDisplayStream = displayStream;
                 displayStream = newDisplayStream;
 
-                const oldAudioContext = audioContext;
-                const oldAudioTracks = mixedStream.getAudioTracks();
-
-                // Re-run audio setup for the new stream's audio, without cleanup.
-                // This creates a new audio context and adds a new track to the mixed stream.
-                await setupAudioMixing(false);
-
-                // Now that the new audio track is in the mixed stream, we can remove the old ones.
-                oldAudioTracks.forEach(track => mixedStream.removeTrack(track));
-                
-                // It is now safe to close the old audio context.
-                if (oldAudioContext) {
-                    oldAudioContext.close().catch(e => console.error("Error closing old audio context", e));
-                }
-
-                // Now that the old display stream's tracks are no longer in mixedStream,
-                // we can safely stop them.
+                // Now that the old display stream's tracks are no longer in use, we can safely stop them.
                 oldDisplayStream.getTracks().forEach(track => track.stop());
 
                 // Update the live preview.
