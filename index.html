@@ -4,323 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
+<meta name="description" content="A screen recorder that runs in your browser. Recordings never leave your device.">
+<meta name="theme-color" content="#f4f4f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f0f11" media="(prefers-color-scheme: dark)">
 <title>Screen Recorder</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2318181b'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%23e5484d'/%3E%3C/svg%3E">
-<style>
-  :root {
-    --bg: #f4f4f5;
-    --surface: #ffffff;
-    --surface-2: #f4f4f5;
-    --text: #18181b;
-    --muted: #52525b;
-    --border: #e4e4e7;
-    --border-strong: #a1a1aa;
-    --primary: #18181b;
-    --on-primary: #ffffff;
-    --primary-hover: #3f3f46;
-    --accent: #2457d6;
-    --accent-hover: #1d47b3;
-    --danger: #c92a2e;
-    --danger-hover: #a82226;
-    --rec: #e5484d;
-    --paused: #d97706;
-    --warn-text: #b45309;
-    --error-text: #b91c1c;
-    --focus: #2457d6;
-    --stage: #0f0f11;
-    --stage-text: #d4d4d8;
-    --radius: 14px;
-    --radius-sm: 10px;
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.05), 0 8px 24px rgb(0 0 0 / 0.06);
-    --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #0f0f11;
-      --surface: #18181b;
-      --surface-2: #232327;
-      --text: #f4f4f5;
-      --muted: #a1a1aa;
-      --border: #2e2e33;
-      --border-strong: #52525b;
-      --primary: #f4f4f5;
-      --on-primary: #18181b;
-      --primary-hover: #d4d4d8;
-      --accent: #3b6cf0;
-      --accent-hover: #2f5ad1;
-      --warn-text: #fbbf24;
-      --error-text: #f87171;
-      --focus: #7c9cff;
-      --stage: #09090b;
-      --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.3);
-    }
-  }
-
-  *, *::before, *::after { box-sizing: border-box; }
-  [hidden] { display: none !important; }
-  html { -webkit-text-size-adjust: 100%; }
-  body {
-    margin: 0;
-    min-height: 100vh;
-    background: var(--bg);
-    color: var(--text);
-    font: 400 1rem/1.5 var(--font);
-    -webkit-font-smoothing: antialiased;
-  }
-  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
-  h1, h2, p { margin: 0; }
-
-  .app {
-    max-width: 960px;
-    margin: 0 auto;
-    padding: clamp(16px, 4vw, 40px) 16px 32px;
-    display: grid;
-    gap: 20px;
-  }
-
-  /* Header */
-  .app-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-  .brand { display: flex; align-items: center; gap: 10px; }
-  .brand svg { flex: none; }
-  .brand h1 { font-size: 1.25rem; font-weight: 650; letter-spacing: -0.01em; }
-  .tagline { color: var(--muted); font-size: 0.9375rem; display: flex; align-items: center; gap: 6px; }
-
-  /* Card */
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    overflow: hidden;
-  }
-  .stage {
-    position: relative;
-    background: var(--stage);
-    aspect-ratio: 16 / 9;
-    max-height: 70vh;
-    width: 100%;
-    display: grid;
-    place-items: center;
-    overflow: hidden;
-  }
-  .stage video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; background: var(--stage); }
-  .stage-empty { color: var(--stage-text); text-align: center; padding: 24px; display: grid; gap: 8px; justify-items: center; }
-  .stage-empty svg { opacity: 0.7; }
-  .stage-empty strong { font-size: 1.0625rem; font-weight: 600; color: #fafafa; }
-  .stage-empty span { font-size: 0.9375rem; max-width: 36ch; }
-
-  .panel { padding: clamp(16px, 3vw, 24px); display: grid; gap: 16px; }
-
-  /* Buttons */
-  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .toolbar .spacer { flex: 1 1 auto; }
-  .btn {
-    -webkit-appearance: none;
-    appearance: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    min-height: 44px;
-    padding: 0 16px;
-    border-radius: var(--radius-sm);
-    border: 1px solid transparent;
-    font: inherit;
-    font-size: 0.9375rem;
-    font-weight: 600;
-    line-height: 1;
-    text-decoration: none;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
-  }
-  .btn svg { flex: none; }
-  .btn:disabled, .btn[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
-  .btn-lg { min-height: 52px; padding: 0 24px; font-size: 1rem; }
-  .btn-primary { background: var(--primary); color: var(--on-primary); }
-  .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
-  .btn-accent { background: var(--accent); color: #fff; }
-  .btn-accent:hover:not(:disabled) { background: var(--accent-hover); }
-  .btn-danger { background: var(--danger); color: #fff; }
-  .btn-danger:hover:not(:disabled) { background: var(--danger-hover); }
-  .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border-strong); }
-  .btn-secondary:hover:not(:disabled) { background: var(--surface-2); }
-  .btn-secondary.is-active { border-color: var(--paused); box-shadow: inset 0 0 0 1px var(--paused); }
-  .btn-link {
-    background: none; border: none; padding: 0; min-height: 0;
-    color: var(--accent); font: inherit; font-size: 0.875rem; font-weight: 600;
-    text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
-  }
-  @media (prefers-color-scheme: dark) { .btn-link { color: var(--focus); } }
-  .rec-icon { width: 12px; height: 12px; border-radius: 50%; background: var(--rec); }
-
-  /* Recording pill */
-  .live { display: grid; gap: 12px; }
-  .live-status { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  .rec-pill {
-    display: inline-flex; align-items: center; gap: 8px;
-    padding: 6px 12px;
-    border-radius: 999px;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    font-weight: 600;
-    font-size: 0.9375rem;
-  }
-  .rec-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--rec); }
-  .rec-pill[data-state="recording"] .rec-dot { animation: pulse 1.6s ease-in-out infinite; }
-  .rec-pill[data-state="paused"] .rec-dot { background: var(--paused); border-radius: 2px; }
-  .rec-pill[data-state="stopping"] .rec-dot { background: var(--border-strong); }
-  .timer { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 500; color: var(--muted); }
-  @keyframes pulse { 50% { opacity: 0.35; } }
-
-  .meter {
-    display: inline-flex; align-items: center; gap: 8px;
-    color: var(--muted); font-size: 0.875rem;
-  }
-  .meter-track { width: 96px; height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
-  .meter-fill { display: block; height: 100%; width: 100%; background: #22a06b; transform-origin: left; transform: scaleX(0); }
-  .meter.is-muted .meter-fill { background: var(--border-strong); }
-
-  .recovery {
-    margin-top: 16px;
-    padding: 12px 16px;
-    display: grid; gap: 10px;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-left: 4px solid var(--paused);
-    border-radius: var(--radius-sm);
-  }
-  .recovery h2 { font-size: 1rem; font-weight: 650; }
-  .recovery ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-  .recovery li { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; }
-  .recovery-info { display: grid; }
-  .recovery-info span { color: var(--muted); font-size: 0.875rem; }
-  .recovery-actions { display: flex; align-items: center; gap: 16px; }
-  .btn-sm { min-height: 36px; padding: 0 12px; font-size: 0.875rem; }
-  .btn-link.is-danger { color: var(--error-text); }
-  .tools { font-size: 0.875rem; color: var(--muted); }
-  .dialog {
-    width: min(440px, calc(100vw - 32px));
-    padding: 24px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
-    color: var(--text);
-    box-shadow: 0 24px 64px rgb(0 0 0 / 0.25);
-  }
-  .dialog::backdrop { background: rgb(0 0 0 / 0.45); }
-  .dialog h2 { font-size: 1.125rem; font-weight: 650; }
-  .dialog p { color: var(--muted); margin: 8px 0 20px; }
-  .dialog .toolbar { justify-content: flex-end; }
-  .live-file { color: var(--muted); font-size: 0.875rem; overflow-wrap: anywhere; }
-  .pip-note { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; color: var(--muted); font-size: 0.9375rem; }
-
-  /* Settings */
-  .settings { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
-  .settings > summary {
-    list-style: none;
-    cursor: pointer;
-    padding: 12px 16px;
-    display: flex; align-items: center; gap: 10px;
-    font-weight: 600;
-    border-radius: var(--radius-sm);
-  }
-  .settings > summary::-webkit-details-marker { display: none; }
-  .settings > summary::before {
-    content: "";
-    width: 8px; height: 8px;
-    border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
-    transform: rotate(-45deg);
-    transition: transform 150ms ease;
-    flex: none;
-    margin-right: 2px;
-  }
-  .settings[open] > summary::before { transform: rotate(45deg); }
-  .settings-summary { color: var(--muted); font-weight: 400; font-size: 0.875rem; margin-left: auto; text-align: right; }
-  .settings-body { padding: 4px 16px 16px; border: 0; margin: 0; min-width: 0; }
-  .settings-body:disabled { opacity: 0.6; }
-  .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
-  .field { display: grid; gap: 6px; align-content: start; }
-  .field-label, legend { font-size: 0.875rem; font-weight: 600; padding: 0; }
-  .hint { color: var(--muted); font-size: 0.8125rem; }
-  fieldset.group { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; min-width: 0; }
-  fieldset.group legend { margin-bottom: 6px; }
-  .select-wrap { position: relative; }
-  .select-wrap::after {
-    content: ""; position: absolute; right: 14px; top: 50%;
-    width: 7px; height: 7px; margin-top: -6px;
-    border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
-    transform: rotate(45deg); pointer-events: none;
-  }
-  select {
-    -webkit-appearance: none; appearance: none;
-    width: 100%; min-height: 44px;
-    padding: 0 40px 0 12px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    background: var(--surface);
-    color: var(--text);
-    font: inherit; font-size: 0.9375rem;
-    text-overflow: ellipsis;
-  }
-  .check { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 0.9375rem; }
-  .check input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--accent); flex: none; cursor: inherit; }
-  .check small { display: block; color: var(--muted); font-size: 0.8125rem; }
-
-  /* Done view */
-  .done { display: grid; gap: 12px; }
-  .done h2 { font-size: 1.125rem; font-weight: 650; }
-  .done h2:focus { outline: none; }
-  .done h2:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; border-radius: 4px; }
-  .file-meta { color: var(--muted); font-size: 0.9375rem; overflow-wrap: anywhere; }
-  .file-meta .sep { margin: 0 6px; }
-
-  /* Status */
-  .status { font-size: 0.9375rem; color: var(--muted); }
-  .status:empty { margin-top: -16px; } /* stays in the DOM as a live region, but takes no space */
-  .status[data-tone="warn"] { color: var(--warn-text); }
-  .status[data-tone="error"] { color: var(--error-text); font-weight: 500; }
-
-  /* Footer */
-  .shortcuts { color: var(--muted); font-size: 0.875rem; text-align: center; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; }
-  .shortcuts h2 { font-size: inherit; font-weight: 600; }
-  .shortcuts ul { display: contents; }
-  .shortcuts li { list-style: none; }
-  kbd {
-    font-family: var(--mono); font-size: 0.8125rem;
-    padding: 1px 6px;
-    border: 1px solid var(--border-strong);
-    border-bottom-width: 2px;
-    border-radius: 5px;
-    background: var(--surface);
-    color: var(--text);
-  }
-  .visually-hidden {
-    position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
-    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
-  }
-
-  @media (max-width: 560px) {
-    .toolbar .btn { flex: 1 1 auto; }
-    .toolbar .spacer { display: none; }
-    .settings-summary { display: none; }
-  }
-  @media (hover: none) { .shortcuts { display: none; } }
-  @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after { animation: none !important; transition: none !important; }
-  }
-  @media (forced-colors: active) {
-    .rec-dot, .rec-icon, .meter-fill { forced-color-adjust: none; }
-    .btn { border-color: ButtonText; }
-  }
-
-  /* Floating (Picture-in-Picture) controls window */
-  .pip-body { margin: 0; padding: 12px; background: var(--surface); min-height: 100vh; }
-  .pip-body .live-status { gap: 8px; }
-  .pip-body .btn { min-height: 40px; padding: 0 12px; flex: 1 1 auto; }
-  .pip-body .hide-in-pip { display: none !important; }
-</style>
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="styles.css">
+<script src="js/media.js" defer></script>
+<script src="js/app.js" defer></script>
 </head>
 <body>
 <div class="app">
@@ -329,20 +22,27 @@
       <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="currentColor"/><circle cx="16" cy="16" r="7" fill="#e5484d"/></svg>
       <h1>Screen Recorder</h1>
     </div>
-    <p class="tagline">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
-      Recordings never leave your device.
-    </p>
+    <div class="header-actions">
+      <p class="tagline">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        Recordings never leave your device.
+      </p>
+      <button id="installBtn" class="btn btn-secondary btn-sm" type="button" hidden>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+        <span>Install app</span>
+      </button>
+    </div>
   </header>
 
   <main class="card">
-    <div class="stage">
+    <div class="stage" id="stage">
       <div class="stage-empty" id="stageEmpty">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
         <strong id="stageTitle">Ready when you are</strong>
         <span id="stageText">Start recording, then pick a screen, window, or tab to capture.</span>
       </div>
       <video id="video" playsinline muted hidden aria-label="Screen preview"></video>
+      <div id="stageCountdown" class="stage-countdown" aria-hidden="true" hidden>3</div>
     </div>
 
     <div class="panel">
@@ -361,6 +61,15 @@
         </section>
       </section>
 
+      <!-- Countdown -->
+      <section id="countdownView" class="countdown" aria-label="Countdown" hidden>
+        <p>Recording starts in <span id="countdownNum">3</span>…</p>
+        <div class="toolbar">
+          <button id="startNowBtn" class="btn btn-primary" type="button">Start now</button>
+          <button id="cancelCountdownBtn" class="btn btn-secondary" type="button">Cancel</button>
+        </div>
+      </section>
+
       <!-- Live -->
       <section id="liveSlot" aria-label="Recording controls" hidden>
         <div id="liveControls" class="live">
@@ -370,12 +79,8 @@
               <span id="recLabel">Recording</span>
               <span id="timer" class="timer" role="timer" aria-label="Elapsed time">0:00</span>
             </div>
-            <div id="micMeter" class="meter" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg>
-              <span class="meter-track"><span id="meterFill" class="meter-fill"></span></span>
-            </div>
+            <p id="liveNotes" class="live-file hide-in-pip" hidden></p>
           </div>
-          <p id="liveFile" class="live-file hide-in-pip" hidden></p>
           <div class="toolbar">
             <button id="pauseBtn" class="btn btn-secondary" type="button" aria-keyshortcuts="Alt+P">
               <svg id="pauseIcon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
@@ -386,6 +91,14 @@
               <svg id="micOnIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg>
               <svg id="micOffIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" hidden><path d="M2 2l20 20M9 9v2a3 3 0 0 0 5.1 2.1M15 9.3V5a3 3 0 0 0-5.7-1.3M5 11a7 7 0 0 0 11.6 5.3M19 11a7 7 0 0 1-.6 2.8M12 18v4"/></svg>
               <span id="muteLabel">Mute mic</span>
+            </button>
+            <button id="cameraBtn" class="btn btn-secondary" type="button" aria-keyshortcuts="Alt+C" hidden>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+              <span id="cameraLabel">Hide camera</span>
+            </button>
+            <button id="markerBtn" class="btn btn-secondary" type="button" aria-keyshortcuts="Alt+K">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+              <span>Add marker</span>
             </button>
             <button id="switchBtn" class="btn btn-secondary hide-in-pip" type="button">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3l4 4-4 4M21 7H8M7 21l-4-4 4-4M3 17h13"/></svg>
@@ -401,6 +114,24 @@
               <span>Stop</span>
             </button>
           </div>
+          <div id="levels" class="levels" hidden>
+            <div id="micLevel" class="level">
+              <label class="level-label" for="micVolume">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg>
+                Mic <output id="micVolumeOut">100%</output>
+              </label>
+              <span class="meter-track" aria-hidden="true"><span id="micMeterFill" class="meter-fill"></span></span>
+              <input type="range" id="micVolume" class="hide-in-pip" min="0" max="200" step="5" value="100">
+            </div>
+            <div id="tabLevel" class="level">
+              <label class="level-label" for="tabVolume">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>
+                Tab audio <output id="tabVolumeOut">100%</output>
+              </label>
+              <span class="meter-track" aria-hidden="true"><span id="tabMeterFill" class="meter-fill"></span></span>
+              <input type="range" id="tabVolume" class="hide-in-pip" min="0" max="200" step="5" value="100">
+            </div>
+          </div>
         </div>
         <div id="pipNote" class="pip-note" hidden>
           <span>Controls are in a floating window.</span>
@@ -413,14 +144,52 @@
         <h2 id="doneHeading" tabindex="-1">Your recording is ready</h2>
         <p class="file-meta" id="fileMeta"></p>
         <div class="toolbar">
-          <a id="saveLink" class="btn btn-accent" href="#" download>
+          <button id="saveBtn" class="btn btn-accent" type="button">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
-            <span>Save recording</span>
-          </a>
+            <span id="saveLabel">Save recording</span>
+          </button>
           <button id="newBtn" class="btn btn-secondary" type="button" aria-keyshortcuts="Alt+R">
             <span class="rec-icon" aria-hidden="true"></span>
             <span>New recording</span>
           </button>
+        </div>
+
+        <div class="edit">
+          <details id="trimPanel" class="settings">
+            <summary>Trim <span id="trimSummary" class="settings-summary"></span></summary>
+            <div class="settings-body">
+              <div class="trim-grid">
+                <div class="field">
+                  <label class="field-label" for="trimStart">Start</label>
+                  <input type="range" id="trimStart" min="0" max="0" step="0.1" value="0">
+                  <div class="trim-row"><output id="trimStartOut" for="trimStart">0:00</output><button id="trimStartHere" class="btn-link" type="button">Use current position</button></div>
+                </div>
+                <div class="field">
+                  <label class="field-label" for="trimEnd">End</label>
+                  <input type="range" id="trimEnd" min="0" max="0" step="0.1" value="0">
+                  <div class="trim-row"><output id="trimEndOut" for="trimEnd">0:00</output><button id="trimEndHere" class="btn-link" type="button">Use current position</button></div>
+                </div>
+              </div>
+              <p id="trimHint" class="hint" aria-live="polite"></p>
+              <div class="toolbar">
+                <button id="applyTrimBtn" class="btn btn-secondary btn-sm" type="button">Apply trim</button>
+                <button id="undoTrimBtn" class="btn-link" type="button" hidden>Undo trim</button>
+              </div>
+            </div>
+          </details>
+
+          <details id="markersPanel" class="settings">
+            <summary>Markers <span id="markersSummary" class="settings-summary"></span></summary>
+            <div class="settings-body">
+              <ol id="markerList" class="marker-list"></ol>
+              <p id="markersEmpty" class="empty-note">No markers yet. Add them while recording, or here at the current playback position.</p>
+              <div class="toolbar">
+                <button id="addMarkerHereBtn" class="btn btn-secondary btn-sm" type="button" aria-keyshortcuts="Alt+K">Add marker at current position</button>
+                <button id="copyChaptersBtn" class="btn-link" type="button">Copy chapter list</button>
+              </div>
+              <p class="hint">Markers are saved as chapters in the file. VLC and most players show them; QuickTime doesn’t show chapters in MP4 files.</p>
+            </div>
+          </details>
         </div>
       </section>
 
@@ -430,11 +199,39 @@
         <fieldset id="settingsBody" class="settings-body">
           <legend class="visually-hidden">Recording settings</legend>
           <div class="settings-grid">
+            <fieldset class="group">
+              <legend>What to record</legend>
+              <label class="check"><input type="radio" name="recordMode" id="recordModeScreen" value="screen" checked> <span>Screen and audio</span></label>
+              <label class="check"><input type="radio" name="recordMode" id="recordModeAudio" value="audio"> <span>Audio only <small>Your microphone and, if you like, a tab’s audio. Much smaller files</small></span></label>
+            </fieldset>
+            <div class="field" id="qualityField">
+              <label class="field-label" for="qualitySelect">Quality</label>
+              <div class="select-wrap">
+                <select id="qualitySelect">
+                  <option value="compact">Compact · 15 fps</option>
+                  <option value="standard" selected>Standard · 30 fps</option>
+                  <option value="high">High · 60 fps</option>
+                </select>
+              </div>
+              <p class="hint" id="qualityHint"></p>
+            </div>
+            <div class="field">
+              <label class="field-label" for="formatSelect">Format</label>
+              <div class="select-wrap">
+                <select id="formatSelect">
+                  <option value="mp4">MP4 · H.264</option>
+                  <option value="vp9">WebM · VP9</option>
+                  <option value="av1">WebM · AV1</option>
+                </select>
+              </div>
+              <p class="hint" id="formatHint"></p>
+            </div>
+
             <div class="field">
               <label class="field-label" for="micSelect">Microphone</label>
               <div class="select-wrap"><select id="micSelect"><option value="default">Default microphone</option><option value="none">No microphone</option></select></div>
               <p class="hint" id="micHint">
-                <button id="micAccessBtn" class="btn-link" type="button">Allow microphone access</button> to choose a specific device.
+                <button id="micAccessBtn" class="btn-link" type="button">Allow microphone access</button> to choose a specific one.
               </p>
             </div>
             <fieldset class="group" id="micProcessing">
@@ -447,9 +244,40 @@
               <legend>Other audio</legend>
               <label class="check"><input type="checkbox" id="systemAudio" checked> <span>Record tab or system audio <small>When the browser offers it for the source you pick</small></span></label>
             </fieldset>
+
+            <div class="field" id="cameraField">
+              <label class="field-label" for="cameraSelect">Webcam bubble</label>
+              <div class="select-wrap"><select id="cameraSelect"><option value="none">No camera</option><option value="default">Default camera</option></select></div>
+              <p class="hint" id="cameraHint">
+                <button id="cameraAccessBtn" class="btn-link" type="button">Allow camera access</button> to choose a specific one.
+              </p>
+              <label class="field-label" for="cameraCorner">Corner</label>
+              <div class="select-wrap">
+                <select id="cameraCorner">
+                  <option value="br">Bottom right</option>
+                  <option value="bl">Bottom left</option>
+                  <option value="tr">Top right</option>
+                  <option value="tl">Top left</option>
+                </select>
+              </div>
+            </div>
+            <fieldset class="group">
+              <legend>Starting and stopping</legend>
+              <label class="check"><input type="checkbox" id="countdownToggle" checked> <span>Count down from 3 <small>Gives you a moment to switch to what you’re recording</small></span></label>
+              <label class="field-label" for="autoStopSelect">Stop automatically after</label>
+              <div class="select-wrap">
+                <select id="autoStopSelect">
+                  <option value="0" selected>Never</option>
+                  <option value="15">15 minutes</option>
+                  <option value="30">30 minutes</option>
+                  <option value="60">1 hour</option>
+                  <option value="120">2 hours</option>
+                </select>
+              </div>
+            </fieldset>
             <fieldset class="group" id="savingGroup">
               <legend>While recording, save to</legend>
-              <label class="check" id="saveModeBrowserLabel"><input type="radio" name="saveMode" id="saveModeBrowser" value="browser" checked> <span>Browser storage <small>Recommended. Survives crashes; save a copy when you’re done</small></span></label>
+              <label class="check" id="saveModeBrowserLabel"><input type="radio" name="saveMode" id="saveModeBrowser" value="browser" checked> <span>Browser storage <small>Recommended. Survives crashes; save it when you’re done</small></span></label>
               <label class="check" id="saveModeFileLabel" hidden><input type="radio" name="saveMode" id="saveModeFile" value="file"> <span>A file you choose <small>Pick a location before recording, such as an external drive</small></span></label>
               <label class="check" id="saveModeMemoryLabel" hidden><input type="radio" name="saveMode" id="saveModeMemory" value="memory"> <span>Memory only <small>Kept until you save it, but lost if the browser crashes</small></span></label>
               <p class="hint" id="storageHint" hidden>Browser storage isn’t available here. If you opened this page as a file, serving it from localhost should fix that.</p>
@@ -460,8 +288,8 @@
 
       <p id="toolsRow" class="tools">
         <button id="repairBtn" class="btn-link" type="button">Repair a recording…</button>
-        Fixes the length and seeking of WebM files that were cut off, including Chrome’s <code>.crswap</code> files.
-        <input id="repairInput" type="file" accept=".webm,.crswap,video/webm" hidden>
+        Fixes the length and seeking of WebM and MP4 files that were cut off, including Chrome’s <code>.crswap</code> files.
+        <input id="repairInput" type="file" accept=".webm,.mp4,.m4a,.crswap,video/webm,video/mp4,audio/mp4,audio/webm" hidden>
       </p>
 
       <p id="status" class="status" role="status" aria-live="polite"></p>
@@ -484,1552 +312,5 @@
     <ul id="shortcutList"></ul>
   </footer>
 </div>
-
-<script>
-'use strict';
-
-// ---------- Elements ----------
-const $ = (id) => document.getElementById(id);
-const els = {
-  stageEmpty: $('stageEmpty'), stageTitle: $('stageTitle'), stageText: $('stageText'), video: $('video'),
-  setupView: $('setupView'), startBtn: $('startBtn'),
-  liveSlot: $('liveSlot'), liveControls: $('liveControls'), recPill: $('recPill'), recLabel: $('recLabel'), timer: $('timer'),
-  micMeter: $('micMeter'), meterFill: $('meterFill'),
-  pauseBtn: $('pauseBtn'), pauseLabel: $('pauseLabel'), pauseIcon: $('pauseIcon'), resumeIcon: $('resumeIcon'),
-  muteBtn: $('muteBtn'), muteLabel: $('muteLabel'), micOnIcon: $('micOnIcon'), micOffIcon: $('micOffIcon'),
-  switchBtn: $('switchBtn'), popoutBtn: $('popoutBtn'), stopBtn: $('stopBtn'),
-  pipNote: $('pipNote'), pipReturnBtn: $('pipReturnBtn'),
-  doneView: $('doneView'), doneHeading: $('doneHeading'), fileMeta: $('fileMeta'), saveLink: $('saveLink'), newBtn: $('newBtn'),
-  settings: $('settings'), settingsBody: $('settingsBody'), settingsSummary: $('settingsSummary'),
-  micSelect: $('micSelect'), micHint: $('micHint'), micAccessBtn: $('micAccessBtn'), micProcessing: $('micProcessing'),
-  noiseSuppression: $('noiseSuppression'), echoCancellation: $('echoCancellation'), leveling: $('leveling'), systemAudio: $('systemAudio'),
-  status: $('status'), shortcutList: $('shortcutList'),
-  liveFile: $('liveFile'), savingGroup: $('savingGroup'), storageHint: $('storageHint'),
-  saveModeBrowserLabel: $('saveModeBrowserLabel'), saveModeFileLabel: $('saveModeFileLabel'), saveModeMemoryLabel: $('saveModeMemoryLabel'),
-  saveModeInputs: [...document.querySelectorAll('input[name="saveMode"]')],
-  recovery: $('recovery'), recoveryHeading: $('recoveryHeading'), recoveryList: $('recoveryList'),
-  toolsRow: $('toolsRow'), repairBtn: $('repairBtn'), repairInput: $('repairInput'),
-  confirmDialog: $('confirmDialog'), confirmTitle: $('confirmTitle'), confirmBody: $('confirmBody'),
-  confirmOk: $('confirmOk'), confirmCancel: $('confirmCancel'),
-};
-
-// ---------- Capabilities ----------
-const canRecord = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia && window.MediaRecorder);
-// Switching sources needs a video track that never changes, which we build with insertable streams (Chromium).
-const canSwitch = 'MediaStreamTrackGenerator' in window && 'MediaStreamTrackProcessor' in window;
-const canPip = 'documentPictureInPicture' in window;
-// Writing straight to a file the user picks (Chromium only).
-const canSaveToDisk = 'showSaveFilePicker' in window;
-// Browser storage (the origin private file system) is checked at startup; see `storage` below.
-const isMac = /mac/i.test((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '');
-
-const MIME_CANDIDATES = [
-  'video/webm;codecs=vp9,opus',
-  'video/webm;codecs=vp8,opus',
-  'video/webm',
-  'video/mp4;codecs=avc1,mp4a.40.2',
-  'video/mp4',
-];
-
-// ---------- Persistence (best effort) ----------
-const store = {
-  get(key, fallback) {
-    try { const v = localStorage.getItem('screen-recorder:' + key); return v === null ? fallback : JSON.parse(v); }
-    catch { return fallback; }
-  },
-  set(key, value) {
-    try { localStorage.setItem('screen-recorder:' + key, JSON.stringify(value)); } catch { /* ignore */ }
-  },
-};
-
-// ---------- State ----------
-// phase: setup | starting | recording | paused | stopping | done
-let phase = 'setup';
-let pipWindow = null;
-let switching = false;
-let rec = null;      // the active recording session
-let result = null;   // what the done view shows { blob, url, filename, durationMs, saved, savedVia, storedName, kind }
-const downloadedThisSession = new Set(); // stored recordings saved via a download that may still be reading them
-let pendingRecovery = null; // the one leftover recording offered for recovery, if any
-
-function isLive() { return phase === 'recording' || phase === 'paused' || phase === 'stopping'; }
-
-// ---------- Helpers ----------
-function formatTime(ms) {
-  const total = Math.floor(ms / 1000);
-  const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), s = total % 60;
-  const ss = String(s).padStart(2, '0');
-  return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
-}
-function spokenTime(ms) {
-  const total = Math.round(ms / 1000);
-  const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), s = total % 60;
-  const parts = [];
-  if (h) parts.push(`${h} hour${h === 1 ? '' : 's'}`);
-  if (m) parts.push(`${m} minute${m === 1 ? '' : 's'}`);
-  if (s || !parts.length) parts.push(`${s} second${s === 1 ? '' : 's'}`);
-  return parts.join(' ');
-}
-function formatBytes(bytes) {
-  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
-  return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
-}
-function fileStem(date) {
-  const p = (n) => String(n).padStart(2, '0');
-  return `screen-recording-${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}-${p(date.getHours())}${p(date.getMinutes())}${p(date.getSeconds())}`;
-}
-function stopStream(stream) {
-  if (stream) stream.getTracks().forEach((t) => { t.onended = null; t.stop(); });
-}
-
-let announceTimer;
-function announce(message, tone = 'info') {
-  // Clear first so repeating the same message is still announced.
-  clearTimeout(announceTimer);
-  els.status.textContent = '';
-  els.status.dataset.tone = tone;
-  announceTimer = setTimeout(() => { els.status.textContent = message; }, 60);
-}
-
-// ---------- Settings ----------
-function readSettings() {
-  return {
-    micId: els.micSelect.value || 'default',
-    noiseSuppression: els.noiseSuppression.checked,
-    echoCancellation: els.echoCancellation.checked,
-    leveling: els.leveling.checked,
-    systemAudio: els.systemAudio.checked,
-    saveMode: currentSaveMode(),
-  };
-}
-function availableSaveModes() {
-  const modes = [];
-  // The first available mode is the default; saving to a chosen file is opt-in.
-  if (storage.ok) modes.push('browser');
-  if (!storage.ok) modes.push('memory');
-  if (canSaveToDisk) modes.push('file');
-  return modes;
-}
-function currentSaveMode() {
-  const modes = availableSaveModes();
-  const checked = els.saveModeInputs.find((i) => i.checked);
-  return checked && modes.includes(checked.value) ? checked.value : modes[0];
-}
-function applySaveModes() {
-  const modes = availableSaveModes();
-  els.saveModeBrowserLabel.hidden = !modes.includes('browser');
-  els.saveModeFileLabel.hidden = !modes.includes('file');
-  els.saveModeMemoryLabel.hidden = !modes.includes('memory');
-  els.storageHint.hidden = storage.ok;
-  const wanted = store.get('settings', {}).saveMode || 'browser';
-  const mode = modes.includes(wanted) ? wanted : modes[0];
-  els.saveModeInputs.forEach((i) => { i.checked = i.value === mode; });
-  updateSettingsSummary();
-}
-function loadSettings() {
-  const s = store.get('settings', {});
-  for (const key of ['noiseSuppression', 'echoCancellation', 'leveling', 'systemAudio']) {
-    if (typeof s[key] === 'boolean') els[key].checked = s[key];
-  }
-  els.settings.open = store.get('settingsOpen', false);
-}
-function saveSettings() {
-  store.set('settings', readSettings());
-  updateSettingsSummary();
-}
-function updateSettingsSummary() {
-  const s = readSettings();
-  const opt = els.micSelect.selectedOptions[0];
-  let mic = s.micId === 'none' ? 'No mic' : (s.micId === 'default' ? 'Default mic' : (opt ? opt.textContent : 'Mic'));
-  if (mic.length > 28) mic = mic.slice(0, 27) + '…';
-  const saving = { browser: 'Saves as it records', file: 'Saves to a file' }[s.saveMode] || '';
-  els.settingsSummary.textContent = [mic, s.systemAudio ? 'Tab audio on' : 'Tab audio off', saving]
-    .filter(Boolean).join(' · ');
-  els.micProcessing.disabled = s.micId === 'none';
-}
-
-async function refreshDevices() {
-  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
-  let devices = [];
-  try { devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput'); }
-  catch (err) { console.warn('Could not list microphones', err); }
-
-  const hasLabels = devices.some((d) => d.label);
-  const wanted = els.micSelect.value || store.get('settings', {}).micId || 'default';
-  const defaultDevice = devices.find((d) => d.deviceId === 'default');
-  const defaultName = defaultDevice && defaultDevice.label ? defaultDevice.label.replace(/^Default\s*-\s*/i, '') : '';
-
-  const options = [['default', defaultName ? `Default (${defaultName})` : 'Default microphone']];
-  if (hasLabels) {
-    for (const d of devices) {
-      if (!d.deviceId || d.deviceId === 'default' || d.deviceId === 'communications') continue;
-      options.push([d.deviceId, d.label || 'Microphone']);
-    }
-  }
-  options.push(['none', 'No microphone']);
-
-  els.micSelect.replaceChildren(...options.map(([value, text]) => new Option(text, value)));
-  els.micSelect.value = options.some(([v]) => v === wanted) ? wanted : 'default';
-  els.micHint.hidden = hasLabels;
-  updateSettingsSummary();
-}
-
-async function requestMicAccess() {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    stopStream(stream);
-    await refreshDevices();
-    announce('Microphone access allowed. Choose a microphone from the list.');
-    els.micSelect.focus();
-  } catch (err) {
-    announce(err.name === 'NotAllowedError'
-      ? 'Microphone access was blocked. You can allow it from the site settings in your browser’s address bar.'
-      : `Couldn’t access a microphone (${err.message || err.name}).`, 'warn');
-  }
-}
-
-// ---------- Capture ----------
-function displayOptions(withAudio) {
-  return {
-    video: { displaySurface: 'browser', cursor: 'always', frameRate: { ideal: 30 } },
-    audio: withAudio ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false } : false,
-    selfBrowserSurface: 'exclude',  // don't offer this tab (avoids an endless mirror)
-    surfaceSwitching: 'include',    // Chromium: native "Share this tab instead"
-    systemAudio: 'include',
-  };
-}
-
-async function getMic(settings) {
-  const audio = {
-    noiseSuppression: settings.noiseSuppression,
-    echoCancellation: settings.echoCancellation,
-    autoGainControl: false, // we do our own leveling in the mixer
-  };
-  if (settings.micId !== 'default') audio.deviceId = { exact: settings.micId };
-  try {
-    return { stream: await navigator.mediaDevices.getUserMedia({ audio }), fellBack: false };
-  } catch (err) {
-    if (err.name === 'OverconstrainedError' || err.name === 'NotFoundError') {
-      delete audio.deviceId; // the chosen device is gone; use the default one
-      return { stream: await navigator.mediaDevices.getUserMedia({ audio }), fellBack: true };
-    }
-    throw err;
-  }
-}
-
-// Mixes the microphone and the shared tab/system audio into one track.
-function createMixer(micStream, displayStream, settings) {
-  const ctx = new AudioContext();
-  const dest = ctx.createMediaStreamDestination();
-  let analyser = null;
-  let micNodes = [];
-  let displayNodes = null;
-
-  if (micStream) {
-    const src = ctx.createMediaStreamSource(micStream);
-    const gain = ctx.createGain();
-    gain.gain.value = 1.5;
-    let last = src.connect(gain);
-    if (settings.leveling) {
-      const comp = ctx.createDynamicsCompressor();
-      comp.threshold.value = -50;
-      comp.knee.value = 40;
-      comp.ratio.value = 12;
-      comp.attack.value = 0.01;
-      comp.release.value = 0.25;
-      last = last.connect(comp);
-    }
-    last.connect(dest);
-    analyser = ctx.createAnalyser();
-    analyser.fftSize = 1024;
-    last.connect(analyser);
-    micNodes = [src];
-  }
-
-  function setDisplay(stream) {
-    const old = displayNodes;
-    displayNodes = null;
-    const [track] = stream ? stream.getAudioTracks() : [];
-    if (track) {
-      const src = ctx.createMediaStreamSource(new MediaStream([track]));
-      const gain = ctx.createGain();
-      gain.gain.value = 0.7;
-      src.connect(gain).connect(dest);
-      displayNodes = { src, gain };
-    }
-    // Connect the new source before dropping the old one so the output never goes idle.
-    if (old) { old.src.disconnect(); old.gain.disconnect(); }
-  }
-  setDisplay(displayStream);
-  ctx.resume().catch(() => {});
-
-  return {
-    track: dest.stream.getAudioTracks()[0],
-    analyser,
-    setDisplay,
-    dropMic() { micNodes.forEach((n) => n.disconnect()); micNodes = []; },
-    close() { ctx.close().catch(() => {}); },
-  };
-}
-
-// Gives MediaRecorder one video track that stays the same while the source behind it changes.
-function createVideoPipe(sourceTrack) {
-  if (!canSwitch) return { track: sourceTrack, setSource: null, stop() {} };
-
-  const generator = new MediaStreamTrackGenerator({ kind: 'video' });
-  generator.contentHint = 'detail'; // favour sharp text over smooth motion
-  const writer = generator.writable.getWriter();
-  let current = 0;
-
-  async function pump(track, id) {
-    const reader = new MediaStreamTrackProcessor({ track }).readable.getReader();
-    try {
-      for (;;) {
-        const { value: frame, done } = await reader.read();
-        if (done) break;
-        if (id !== current) { frame.close(); break; }
-        try { await writer.write(frame); } catch { frame.close(); break; }
-      }
-    } catch (err) {
-      console.warn('Video pipe stopped', err);
-    } finally {
-      reader.cancel().catch(() => {});
-    }
-  }
-  function setSource(track) { current += 1; pump(track, current); }
-  setSource(sourceTrack);
-
-  return {
-    track: generator,
-    setSource,
-    stop() { current += 1; writer.close().catch(() => {}); generator.stop(); },
-  };
-}
-
-function pickMimeType() {
-  return MIME_CANDIDATES.find((t) => MediaRecorder.isTypeSupported(t)) || '';
-}
-
-// ---------- Browser storage (origin private file system) ----------
-// Recordings are written from a worker with a sync access handle, which writes in place and
-// flushes every second. Unlike a normal file write, nothing is held back until the end, so a
-// crash only loses the last moment.
-const STORAGE_WORKER = `
-let handle = null, pos = 0, chain = Promise.resolve(), dirPromise = null;
-function dir() {
-  if (!dirPromise) dirPromise = navigator.storage.getDirectory().then((root) => root.getDirectoryHandle('recordings', { create: true }));
-  return dirPromise;
-}
-async function run(msg) {
-  if (msg.type === 'probe') {
-    const d = await dir();
-    const fh = await d.getFileHandle('.probe', { create: true });
-    const h = await fh.createSyncAccessHandle();
-    await h.close();
-    await d.removeEntry('.probe');
-  } else if (msg.type === 'open') {
-    const d = await dir();
-    const fh = await d.getFileHandle(msg.name, { create: true });
-    handle = await fh.createSyncAccessHandle();
-    await handle.truncate(0);
-    pos = 0;
-  } else if (msg.type === 'write') {
-    const data = new Uint8Array(msg.buf);
-    const n = await handle.write(data, { at: pos });
-    pos += n;
-    await handle.flush();
-    if (n !== data.byteLength) throw new DOMException('Not enough space to keep recording.', 'QuotaExceededError');
-  } else if (msg.type === 'close') {
-    if (handle) { await handle.flush(); await handle.close(); handle = null; }
-  }
-}
-onmessage = (e) => {
-  const msg = e.data;
-  if (msg.type === 'discard') {
-    // The page is going away: close at once (this is synchronous), then delete, skipping the queue.
-    try { if (handle) handle.close(); } catch (err) { /* ignore */ }
-    handle = null;
-    dir().then((d) => d.removeEntry(msg.name)).catch(() => {});
-    return;
-  }
-  chain = chain.then(() => run(msg)).then(
-    () => postMessage({ id: msg.id, ok: true }),
-    (err) => postMessage({ id: msg.id, ok: false, name: err && err.name, message: err && err.message }));
-};`;
-
-const storage = {
-  ok: false,
-  worker: null,
-  nextId: 1,
-  pending: new Map(),
-  call(type, extra = {}, transfer = []) {
-    return new Promise((resolve, reject) => {
-      const id = this.nextId++;
-      this.pending.set(id, { resolve, reject });
-      this.worker.postMessage({ id, type, ...extra }, transfer);
-    });
-  },
-  async init() {
-    try {
-      if (!navigator.storage || !navigator.storage.getDirectory || !window.Worker) return false;
-      const url = URL.createObjectURL(new Blob([STORAGE_WORKER], { type: 'text/javascript' }));
-      this.worker = new Worker(url);
-      this.worker.onmessage = (e) => {
-        const { id, ok, name, message } = e.data;
-        const p = this.pending.get(id);
-        if (!p) return;
-        this.pending.delete(id);
-        if (ok) p.resolve();
-        else { const err = new Error(message || name || 'Storage error'); err.name = name || 'Error'; p.reject(err); }
-      };
-      this.worker.onerror = (e) => {
-        e.preventDefault();
-        for (const p of this.pending.values()) p.reject(new Error('The storage worker stopped.'));
-        this.pending.clear();
-      };
-      await Promise.race([this.call('probe'), new Promise((_, reject) => setTimeout(() => reject(new Error('timed out')), 5000))]);
-      await this.dir(); // the main thread needs access too, for reading and deleting
-      this.ok = true;
-    } catch (err) {
-      console.warn('Browser storage is unavailable', err);
-      this.ok = false;
-    }
-    return this.ok;
-  },
-  dirHandle: null,
-  async dir() {
-    if (!this.dirHandle) {
-      const root = await navigator.storage.getDirectory();
-      this.dirHandle = await root.getDirectoryHandle('recordings', { create: true });
-    }
-    return this.dirHandle;
-  },
-  // For use while the page unloads: starts the deletion immediately, without waiting on anything.
-  removeNow(name) {
-    meta.set(name, { discarded: true }); // if the deletion doesn't finish, the next visit cleans it up
-    if (this.dirHandle) this.dirHandle.removeEntry(name).catch(() => {});
-  },
-  async getFile(name) {
-    return (await (await this.dir()).getFileHandle(name)).getFile();
-  },
-  async remove(name) {
-    try { await (await this.dir()).removeEntry(name); } catch (err) { console.warn('Could not delete', name, err); }
-    meta.remove(name);
-  },
-  async list() {
-    const names = [];
-    for await (const h of (await this.dir()).values()) if (h.kind === 'file' && !h.name.startsWith('.')) names.push(h.name);
-    return names;
-  },
-};
-
-// A little bookkeeping per stored recording (kept in localStorage; the files are the source of truth).
-const meta = {
-  all() { return store.get('recordings', {}); },
-  get(name) { return this.all()[name] || {}; },
-  set(name, patch) { const all = this.all(); all[name] = { ...(all[name] || {}), ...patch }; store.set('recordings', all); },
-  remove(name) { const all = this.all(); delete all[name]; store.set('recordings', all); },
-};
-
-// A Web Lock marks a recording as in progress, so another open tab won't offer to "recover" it.
-const LOCK_PREFIX = 'screen-recorder:';
-function holdLock(name) {
-  if (!navigator.locks) return Promise.resolve(() => {});
-  return new Promise((acquired) => {
-    navigator.locks.request(LOCK_PREFIX + name, () => new Promise((release) => acquired(release)))
-      .catch(() => acquired(() => {}));
-  });
-}
-async function heldLocks() {
-  try { return new Set(((await navigator.locks.query()).held || []).map((l) => l.name)); }
-  catch { return new Set(); }
-}
-
-async function openBrowserOutput(stem, mimeType) {
-  const name = stem + (mimeType.includes('mp4') ? '.mp4' : '.webm');
-  const release = await holdLock(name);
-  try { await storage.call('open', { name }); }
-  catch (err) { release(); throw err; }
-  meta.set(name, { startedAt: Date.now(), finished: false, saved: false });
-  return { kind: 'browser', name, release, queue: Promise.resolve(), bytes: 0, failed: false };
-}
-
-async function lowSpaceWarning() {
-  try {
-    const { quota, usage } = await navigator.storage.estimate();
-    const free = quota - usage;
-    if (free < 2 * 1024 ** 3) return `Only ${formatBytes(free)} of browser storage is free, which may not be enough for a long recording.`;
-  } catch { /* unknown */ }
-  return '';
-}
-
-// ---------- Output file (save while recording) ----------
-async function openOutputFile(stem, mimeType) {
-  const mp4 = mimeType.includes('mp4');
-  const ext = mp4 ? '.mp4' : '.webm';
-  const handle = await window.showSaveFilePicker({
-    suggestedName: stem + ext,
-    id: 'screen-recorder',
-    startIn: 'videos',
-    types: [{ description: mp4 ? 'MP4 video' : 'WebM video', accept: { [mp4 ? 'video/mp4' : 'video/webm']: [ext] } }],
-  });
-  const writable = await handle.createWritable();
-  return { kind: 'file', name: handle.name, handle, writable, queue: Promise.resolve(), bytes: 0, failed: false };
-}
-
-// Used when recording never got going: drop the pending write, and remove the file only if it's empty.
-async function discardOutput(output) {
-  if (!output) return;
-  if (output.kind === 'browser') {
-    try { await storage.call('close'); } catch { /* already closed */ }
-    output.release();
-    await storage.remove(output.name);
-    return;
-  }
-  try { await output.writable.abort(); } catch { /* already closed */ }
-  try {
-    const file = await output.handle.getFile();
-    if (file.size === 0 && output.handle.remove) await output.handle.remove();
-  } catch { /* leave it */ }
-}
-
-// Writes go through a queue so chunks land in order.
-function writeChunk(session, data) {
-  const out = session.output;
-  out.bytes += data.size;
-  const write = out.kind === 'file'
-    ? () => out.writable.write(data)
-    : async () => { const buf = await data.arrayBuffer(); await storage.call('write', { buf }, [buf]); };
-  out.queue = out.queue.then(write).catch((err) => {
-    if (out.failed) return;
-    out.failed = true;
-    console.error('Writing failed', err);
-    const full = err && err.name === 'QuotaExceededError';
-    announce(out.kind === 'file'
-      ? `Couldn’t write to ${out.name}${full ? ' because the disk is full' : ''}. Recording stopped.`
-      : `Couldn’t keep saving${full ? ' because storage is full' : ''}, so the recording was stopped. Everything up to that point is kept.`, 'error');
-    stopRecording();
-  });
-}
-
-// ---------- Recording flow ----------
-async function startRecording() {
-  if (phase !== 'setup' || !canRecord) return;
-  if (pendingRecovery) {
-    const old = pendingRecovery;
-    const ok = await askConfirm({
-      title: 'Delete the unsaved recording?',
-      body: `Only one recording is kept in this browser, so starting a new one deletes the unsaved recording from ${old.when}.`,
-      confirmLabel: 'Delete and start recording',
-    });
-    if (!ok || phase !== 'setup') return;
-    pendingRecovery = null;
-    els.recovery.hidden = true;
-    storage.remove(old.name); // not awaited: the screen picker needs to open while the click still counts
-  }
-  const settings = readSettings();
-  const stem = fileStem(new Date());
-  const mimeType = pickMimeType();
-  const warnings = [];
-  setPhase('starting');
-
-  let mode = settings.saveMode;
-  if (mode === 'browser' && !storage.ok) mode = 'memory';
-  if (mode === 'file' && !canSaveToDisk) mode = 'memory';
-
-  // Ask for the file first: the save dialog needs the click that just happened.
-  let output = null;
-  if (mode === 'file') {
-    announce('Choose where to save the recording.');
-    try {
-      output = await openOutputFile(stem, mimeType);
-    } catch (err) {
-      if (err.name === 'AbortError') {
-        setPhase('setup');
-        announce('Recording not started, because no save location was chosen.');
-        els.startBtn.focus();
-        return;
-      }
-      console.warn('Could not open output file', err);
-      warnings.push('Couldn’t open a file to save into, so the recording is kept in memory until you save it.');
-    }
-  }
-
-  announce('Choose a screen, window, or tab to record.');
-  let display;
-  try {
-    display = await navigator.mediaDevices.getDisplayMedia(displayOptions(settings.systemAudio));
-  } catch (err) {
-    console.warn('getDisplayMedia failed', err);
-    discardOutput(output);
-    setPhase('setup');
-    if (err.name === 'NotAllowedError') announce('Screen selection was cancelled. Nothing was recorded.');
-    else if (err.name === 'NotFoundError') announce('No screen, window, or tab is available to record.', 'error');
-    else announce(`Couldn’t start screen capture: ${err.message || err.name}`, 'error');
-    els.startBtn.focus();
-    return;
-  }
-  const [videoTrack] = display.getVideoTracks();
-  videoTrack.contentHint = 'detail';
-
-  // Browser storage is opened after the screen picker, which some browsers only allow right after a click.
-  if (mode === 'browser') {
-    try {
-      output = await openBrowserOutput(stem, mimeType);
-      const low = await lowSpaceWarning();
-      if (low) warnings.push(low);
-      if (navigator.storage.persist) navigator.storage.persist().catch(() => {});
-    } catch (err) {
-      console.warn('Could not open browser storage', err);
-      warnings.push('Couldn’t use browser storage, so the recording is kept in memory until you save it.');
-    }
-  }
-
-  let micStream = null;
-  if (settings.micId !== 'none') {
-    try {
-      const mic = await getMic(settings);
-      micStream = mic.stream;
-      if (mic.fellBack) warnings.push('The chosen microphone wasn’t available, so the default one is being used.');
-    } catch (err) {
-      console.warn('Microphone failed', err);
-      warnings.push(err.name === 'NotAllowedError'
-        ? 'Microphone access was blocked, so only screen audio is being recorded.'
-        : 'No microphone could be opened, so only screen audio is being recorded.');
-    }
-    refreshDevices(); // labels are available once permission is granted
-  }
-  if (settings.systemAudio && display.getAudioTracks().length === 0) {
-    warnings.push('This source didn’t share audio. To include it, pick a tab and turn on “Share tab audio”.');
-  }
-
-  // If the user stopped sharing while we were opening the mic, bail out.
-  if (videoTrack.readyState === 'ended') {
-    stopStream(display); stopStream(micStream);
-    discardOutput(output);
-    setPhase('setup');
-    announce('Screen sharing ended before recording started.', 'warn');
-    return;
-  }
-
-  const wantsAudio = !!micStream || settings.systemAudio;
-  const mixer = wantsAudio ? createMixer(micStream, display, settings) : null;
-  const pipe = createVideoPipe(videoTrack);
-  const stream = new MediaStream(mixer ? [pipe.track, mixer.track] : [pipe.track]);
-
-  let recorder;
-  try {
-    recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-  } catch (err) {
-    console.error(err);
-    pipe.stop(); if (mixer) mixer.close(); stopStream(display); stopStream(micStream);
-    discardOutput(output);
-    setPhase('setup');
-    announce(`This browser couldn’t start a recording: ${err.message || err.name}`, 'error');
-    return;
-  }
-
-  const session = rec = {
-    recorder, display, micStream, mixer, pipe, mimeType, output,
-    chunks: [],
-    stem,
-    muted: false,
-    elapsed: 0,
-    segmentStart: performance.now(),
-    timerId: 0,
-    meterRaf: 0,
-  };
-
-  recorder.ondataavailable = (e) => {
-    if (!e.data || !e.data.size) return;
-    if (session.output) writeChunk(session, e.data);
-    else session.chunks.push(e.data);
-  };
-  recorder.onstop = finalizeRecording;
-  recorder.onerror = (e) => {
-    console.error('MediaRecorder error', e.error || e);
-    announce(`Recording error: ${(e.error && e.error.message) || 'unknown problem'}. Saving what was captured.`, 'error');
-    stopRecording();
-  };
-
-  watchDisplayTrack(videoTrack);
-  if (micStream) {
-    micStream.getAudioTracks()[0].onended = () => {
-      if (!rec) return;
-      rec.mixer && rec.mixer.dropMic();
-      rec.micStream = null;
-      render();
-      announce('The microphone was disconnected. Recording continues without it.', 'warn');
-    };
-  }
-
-  els.video.removeAttribute('src');
-  els.video.controls = false;
-  els.video.muted = true;
-  els.video.srcObject = display;
-  els.video.play().catch(() => {});
-
-  recorder.start(1000); // emit data every second so nothing is held in one giant chunk
-  rec.timerId = setInterval(tick, 500);
-  setPhase('recording');
-  tick();
-  startMeter();
-  announce(['Recording started.', ...warnings].join(' '), warnings.length ? 'warn' : 'info');
-  els.pauseBtn.focus();
-}
-
-function watchDisplayTrack(track) {
-  track.onended = () => {
-    if (!rec || switching) return;
-    announce('Screen sharing ended, so the recording was stopped.');
-    stopRecording();
-  };
-}
-
-function elapsedMs() {
-  if (!rec) return 0;
-  return rec.elapsed + (phase === 'recording' ? performance.now() - rec.segmentStart : 0);
-}
-
-function tick() {
-  if (!rec) return;
-  const t = formatTime(elapsedMs());
-  els.timer.textContent = t;
-  if (rec.output && !rec.output.failed) {
-    const where = rec.output.kind === 'file' ? rec.output.name : 'browser storage';
-    els.liveFile.textContent = `Saving to ${where} as it records · ${formatBytes(rec.output.bytes)}`;
-  }
-  document.title = `${phase === 'paused' ? '❚❚ Paused' : '● Recording'} ${t} · Screen Recorder`;
-}
-
-function togglePause() {
-  if (!rec) return;
-  if (phase === 'recording' && rec.recorder.state === 'recording') {
-    rec.recorder.pause();
-    rec.elapsed += performance.now() - rec.segmentStart;
-    setPhase('paused');
-    announce('Recording paused.');
-  } else if (phase === 'paused' && rec.recorder.state === 'paused') {
-    rec.recorder.resume();
-    rec.segmentStart = performance.now();
-    setPhase('recording');
-    announce('Recording resumed.');
-  }
-  tick();
-}
-
-function toggleMute() {
-  if (!rec || !rec.micStream) return;
-  rec.muted = !rec.muted;
-  rec.micStream.getAudioTracks().forEach((t) => { t.enabled = !rec.muted; });
-  render();
-  announce(rec.muted ? 'Microphone muted.' : 'Microphone on.');
-}
-
-function stopRecording() {
-  if (!rec || phase === 'stopping') return;
-  if (phase === 'recording') rec.elapsed += performance.now() - rec.segmentStart;
-  setPhase('stopping');
-  if (rec.recorder.state !== 'inactive') rec.recorder.stop();
-  else finalizeRecording();
-}
-
-async function finalizeRecording() {
-  if (!rec) return;
-  const session = rec;
-  rec = null;
-  clearInterval(session.timerId);
-  cancelAnimationFrame(session.meterRaf);
-  closePip();
-  session.pipe.stop();
-  if (session.mixer) session.mixer.close();
-  stopStream(session.display);
-  stopStream(session.micStream);
-  document.title = 'Screen Recorder';
-
-  const durationMs = session.elapsed + (phase === 'recording' ? performance.now() - session.segmentStart : 0);
-  const type = (session.recorder.mimeType || session.mimeType || 'video/webm').split(';')[0];
-  const ext = type.includes('mp4') ? 'mp4' : 'webm';
-  const out = session.output;
-  let blob, filename, storedName = null, onDisk = false, fixWarning = '';
-
-  if (out && out.kind === 'file') {
-    announce('Finishing the file…');
-    try {
-      await out.queue;
-      if (out.failed) throw new Error('write failed');
-      await out.writable.close();
-      blob = await out.handle.getFile();
-      filename = out.name;
-      onDisk = true;
-    } catch (err) {
-      console.error('Could not finish the file', err);
-      try { await out.writable.abort(); } catch { /* already errored */ }
-      blob = null;
-    }
-    if (blob && blob.size && ext === 'webm') {
-      try {
-        const fixed = await fixWebmDuration(blob, durationMs);
-        if (fixed !== blob) {
-          const w = await out.handle.createWritable();
-          await w.write(fixed);
-          await w.close();
-          blob = await out.handle.getFile();
-        }
-      } catch (err) {
-        console.warn('Could not add duration to the saved file', err);
-        fixWarning = ' Some players may not be able to skip around in it.';
-      }
-    }
-  } else if (out && out.kind === 'browser') {
-    announce('Finishing the recording…');
-    try { await out.queue; } catch { /* already reported */ }
-    try { await storage.call('close'); } catch (err) { console.warn('Closing the stored recording failed', err); }
-    out.release();
-    filename = storedName = out.name;
-    try { blob = new Blob([await storage.getFile(out.name)], { type }); }
-    catch (err) { console.error('Could not read the stored recording', err); blob = null; }
-    meta.set(out.name, { finished: true, durationMs });
-    if (blob && blob.size && ext === 'webm') blob = await fixWebmDuration(blob, durationMs);
-    if (out.failed) fixWarning = ' Storage ran out, so it ends early.';
-  } else {
-    blob = new Blob(session.chunks, { type });
-    filename = `${session.stem}.${ext}`;
-    if (blob.size && ext === 'webm') blob = await fixWebmDuration(blob, durationMs);
-  }
-
-  if (!blob || !blob.size) {
-    if (storedName) storage.remove(storedName);
-    els.video.srcObject = null;
-    setPhase('setup');
-    if (!out || !out.failed) {
-      announce(out && out.kind === 'file' && !blob
-        ? `Couldn’t finish writing ${out.name}. The recording was lost.`
-        : 'Nothing was captured, so there’s no file to save. Please try again.', 'error');
-    }
-    els.startBtn.focus();
-    return;
-  }
-
-  const spoken = spokenTime(durationMs);
-  let message;
-  if (onDisk) message = `Recording finished: ${spoken}, saved as ${filename}.${fixWarning}`;
-  else if (storedName) message = `Recording finished: ${spoken}.${fixWarning} Save it to keep it.`;
-  else message = `Recording finished: ${spoken}. Play it back or save it.`;
-  showResult(
-    { kind: 'recording', blob, durationMs, filename, saved: onDisk, onDisk, storedName },
-    onDisk ? 'Saved to your computer' : 'Your recording is ready',
-    message, fixWarning ? 'warn' : 'info');
-}
-
-// Shows a recording (new, recovered, or repaired) in the done view.
-function showResult(r, heading, message, tone = 'info') {
-  result = { ...r, url: URL.createObjectURL(r.blob) };
-  els.video.srcObject = null;
-  els.video.src = result.url;
-  els.video.muted = false;
-  els.video.controls = true;
-  els.video.setAttribute('aria-label', 'Recorded video');
-  els.saveLink.href = result.url;
-  els.saveLink.download = result.filename;
-  els.saveLink.hidden = !!result.onDisk;
-  els.fileMeta.innerHTML = '';
-  [result.filename, result.durationMs != null ? formatTime(result.durationMs) : '', formatBytes(result.blob.size)]
-    .filter(Boolean)
-    .forEach((text, i) => {
-      if (i) { const sep = document.createElement('span'); sep.className = 'sep'; sep.setAttribute('aria-hidden', 'true'); sep.textContent = '·'; els.fileMeta.append(sep); }
-      els.fileMeta.append(document.createTextNode(text));
-    });
-  els.doneHeading.textContent = heading;
-  setPhase('done');
-  announce(message, tone);
-  els.doneHeading.focus();
-}
-
-// ---------- Saving a copy ----------
-function videoFileType(filename) {
-  return /\.mp4$/i.test(filename)
-    ? { description: 'MP4 video', accept: { 'video/mp4': ['.mp4'] } }
-    : { description: 'WebM video', accept: { 'video/webm': ['.webm'] } };
-}
-function markSaved(via) {
-  result.saved = true;
-  result.savedVia = via;
-  if (result.storedName) {
-    meta.set(result.storedName, { saved: true });
-    if (via === 'download') downloadedThisSession.add(result.storedName);
-  }
-}
-async function saveCopyWithPicker() {
-  const r = result;
-  let handle;
-  try {
-    handle = await window.showSaveFilePicker({ suggestedName: r.filename, id: 'screen-recorder', startIn: 'videos', types: [videoFileType(r.filename)] });
-  } catch (err) {
-    if (err.name !== 'AbortError') announce(`Couldn’t save: ${err.message || err.name}`, 'error');
-    return;
-  }
-  r.saving = true;
-  render();
-  announce(`Saving ${handle.name}…`);
-  try {
-    const w = await handle.createWritable();
-    await w.write(r.blob);
-    await w.close();
-    markSaved('picker');
-    announce(`Saved as ${handle.name}.`);
-  } catch (err) {
-    announce(`Couldn’t save ${handle.name}: ${err.message || err.name}`, 'error');
-  } finally {
-    r.saving = false;
-    render();
-  }
-}
-
-// ---------- Recovering stored recordings ----------
-async function refreshRecovery({ announceFound = false } = {}) {
-  if (!storage.ok) { els.recovery.hidden = true; return; }
-  let names = [];
-  try { names = await storage.list(); } catch (err) { console.warn('Could not list stored recordings', err); }
-  const locks = await heldLocks();
-  const busy = new Set([result && result.storedName, rec && rec.output && rec.output.name, ...downloadedThisSession].filter(Boolean));
-  let items = [];
-  for (const name of names) {
-    if (busy.has(name) || locks.has(LOCK_PREFIX + name)) continue;
-    const m = meta.get(name);
-    // Saved on an earlier visit, or the page was left on purpose: not something to recover.
-    if (m.saved || m.discarded) { await storage.remove(name); continue; }
-    let file;
-    try { file = await storage.getFile(name); } catch { continue; }
-    if (!file.size) { await storage.remove(name); continue; }
-    items.push({ name, size: file.size, when: m.startedAt || file.lastModified, finished: !!m.finished, durationMs: m.durationMs });
-  }
-  // Forget bookkeeping for files that no longer exist.
-  for (const name of Object.keys(meta.all())) if (!names.includes(name)) meta.remove(name);
-  // Only one recording is ever kept: offer the newest, delete any others.
-  items.sort((a, b) => b.when - a.when);
-  for (const extra of items.slice(1)) await storage.remove(extra.name);
-  items = items.slice(0, 1);
-  pendingRecovery = items[0]
-    ? { ...items[0], when: new Date(items[0].when).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) }
-    : null;
-
-  els.recoveryList.replaceChildren(...items.map((item) => {
-    const when = new Date(item.when).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-    const li = document.createElement('li');
-    const info = document.createElement('div');
-    info.className = 'recovery-info';
-    const title = document.createElement('strong');
-    title.textContent = when;
-    const detail = document.createElement('span');
-    detail.textContent = [item.finished ? (item.durationMs ? formatTime(item.durationMs) : '') : 'Interrupted', formatBytes(item.size)]
-      .filter(Boolean).join(' · ');
-    info.append(title, detail);
-
-    const actions = document.createElement('div');
-    actions.className = 'recovery-actions';
-    const open = document.createElement('button');
-    open.type = 'button';
-    open.className = 'btn btn-secondary btn-sm';
-    open.textContent = 'Open';
-    open.setAttribute('aria-label', `Open recording from ${when}`);
-    open.addEventListener('click', () => openStored(item.name));
-    const del = document.createElement('button');
-    del.type = 'button';
-    del.className = 'btn-link is-danger';
-    del.textContent = 'Delete';
-    del.setAttribute('aria-label', `Delete recording from ${when}`);
-    del.addEventListener('click', async () => {
-      const ok = await askConfirm({ title: 'Delete this recording?', body: 'This can’t be undone.', confirmLabel: 'Delete' });
-      if (!ok) return;
-      await storage.remove(item.name);
-      await refreshRecovery();
-      announce('Recording deleted.');
-      els.startBtn.focus();
-    });
-    actions.append(open, del);
-    li.append(info, actions);
-    return li;
-  }));
-  els.recovery.hidden = items.length === 0;
-  if (announceFound && items.length) announce('Found an unsaved recording from earlier.');
-}
-
-async function openStored(name) {
-  if (phase !== 'setup') return;
-  announce('Opening the recording…');
-  try {
-    const file = await storage.getFile(name);
-    const isWebm = /\.webm$/i.test(name);
-    let blob = new Blob([file], { type: isWebm ? 'video/webm' : 'video/mp4' });
-    let durationMs = meta.get(name).durationMs ?? null;
-    let note = '';
-    if (isWebm) {
-      const repaired = await repairWebm(blob);
-      blob = repaired.blob;
-      durationMs = repaired.durationMs;
-      if (repaired.trimmedBytes) note = ' The last moment before it was interrupted couldn’t be kept.';
-    }
-    pendingRecovery = null;
-    showResult({ kind: 'recovered', blob, durationMs, filename: name, saved: false, storedName: name }, 'Recovered recording',
-      `Recovered a recording${durationMs != null ? ` of ${spokenTime(durationMs)}` : ''}.${note} Save a copy to keep it.`);
-  } catch (err) {
-    console.error(err);
-    announce(`Couldn’t open that recording: ${err.message || err.name}`, 'error');
-  }
-}
-
-// ---------- Repair tool ----------
-async function repairFile(file) {
-  if (phase !== 'setup') return;
-  announce(`Checking ${file.name}…`);
-  try {
-    const r = await repairWebm(file);
-    const base = file.name.replace(/\.crswap$/i, '').replace(/\.(webm|mkv)$/i, '');
-    const parts = [`Repaired ${file.name}. It’s ${spokenTime(r.durationMs)} long.`];
-    if (r.trimmedBytes) parts.push('An incomplete bit at the end was removed.');
-    parts.push('Save the repaired copy to keep it. The original file isn’t changed.');
-    showResult({ kind: 'repaired', blob: r.blob, durationMs: r.durationMs, filename: `${base}-repaired.webm`, saved: false },
-      'Repaired recording ready', parts.join(' '));
-  } catch (err) {
-    console.warn('Repair failed', err);
-    announce(err.message || 'That file couldn’t be repaired.', 'error');
-  }
-}
-
-async function switchSource() {
-  if (!rec || !rec.pipe.setSource || switching || !(phase === 'recording' || phase === 'paused')) return;
-  switching = true;
-  render();
-  announce('Choose a new screen, window, or tab. The recording keeps going.');
-  try {
-    const next = await navigator.mediaDevices.getDisplayMedia(displayOptions(readSettings().systemAudio));
-    if (!rec) { stopStream(next); return; }
-    const [track] = next.getVideoTracks();
-    track.contentHint = 'detail';
-    rec.pipe.setSource(track);
-    if (rec.mixer) rec.mixer.setDisplay(next);
-    const old = rec.display;
-    rec.display = next;
-    watchDisplayTrack(track);
-    stopStream(old);
-    els.video.srcObject = next;
-    els.video.play().catch(() => {});
-    announce('Now recording the new source.');
-  } catch (err) {
-    announce(err.name === 'NotAllowedError' ? 'Kept recording the current source.' : `Couldn’t switch source: ${err.message || err.name}`,
-      err.name === 'NotAllowedError' ? 'info' : 'error');
-  } finally {
-    switching = false;
-    render();
-    // If the old source ended while the picker was open, stop now.
-    if (rec && rec.display.getVideoTracks()[0].readyState === 'ended') stopRecording();
-  }
-}
-
-async function newRecording() {
-  if (phase !== 'done' || (result && result.saving)) return;
-  if (result && !result.saved) {
-    const repaired = result.kind === 'repaired';
-    const ok = await askConfirm({
-      title: repaired ? 'Discard the repaired copy?' : 'Discard this recording?',
-      body: repaired ? 'The original file isn’t changed.' : 'It hasn’t been saved, so it will be gone for good.',
-      confirmLabel: 'Discard',
-    });
-    if (!ok || phase !== 'done') return;
-  }
-  const old = result;
-  result = null;
-  els.video.pause();
-  els.video.removeAttribute('src');
-  els.video.load();
-  els.video.controls = false;
-  els.video.setAttribute('aria-label', 'Screen preview');
-  let removal = null;
-  if (old) {
-    URL.revokeObjectURL(old.url);
-    // A copy saved as a regular download may still be reading from storage, so that one is cleaned up on a later visit.
-    if (old.storedName && old.savedVia !== 'download') removal = storage.remove(old.storedName);
-  }
-  setPhase('setup');
-  Promise.resolve(removal).then(() => refreshRecovery());
-  announce('Ready for a new recording.');
-  els.startBtn.focus();
-}
-
-// ---------- Mic level meter ----------
-function startMeter() {
-  if (!rec || !rec.mixer || !rec.mixer.analyser) return;
-  const analyser = rec.mixer.analyser;
-  const data = new Float32Array(analyser.fftSize);
-  let level = 0;
-  const frame = () => {
-    if (!rec) return;
-    analyser.getFloatTimeDomainData(data);
-    let sum = 0;
-    for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
-    const db = 20 * Math.log10(Math.sqrt(sum / data.length) || 1e-8);
-    const target = Math.min(1, Math.max(0, (db + 60) / 60));
-    level = target > level ? target : level * 0.9 + target * 0.1;
-    els.meterFill.style.transform = `scaleX(${level.toFixed(3)})`;
-    // Use whichever window currently shows the meter (main page or floating controls).
-    const view = els.meterFill.ownerDocument.defaultView || window;
-    rec.meterRaf = view.requestAnimationFrame(frame);
-  };
-  frame();
-}
-
-// ---------- Floating controls (Document Picture-in-Picture) ----------
-async function openPip() {
-  if (!canPip || pipWindow || !isLive()) return;
-  try {
-    pipWindow = await documentPictureInPicture.requestWindow({ width: 380, height: 132 });
-  } catch (err) {
-    announce(`Couldn’t open floating controls: ${err.message || err.name}`, 'error');
-    return;
-  }
-  const doc = pipWindow.document;
-  doc.title = 'Recording controls';
-  document.querySelectorAll('style').forEach((s) => doc.head.append(s.cloneNode(true)));
-  doc.body.className = 'pip-body';
-  doc.body.append(els.liveControls);
-  doc.addEventListener('keydown', onKeydown);
-  pipWindow.addEventListener('pagehide', () => {
-    els.liveSlot.prepend(els.liveControls);
-    pipWindow = null;
-    render();
-    if (rec) { cancelAnimationFrame(rec.meterRaf); startMeter(); }
-    const active = document.activeElement;
-    if (isLive() && (!active || active === document.body || els.pipNote.contains(active))) els.pauseBtn.focus();
-  });
-  if (rec) { cancelAnimationFrame(rec.meterRaf); startMeter(); }
-  render();
-  announce('Controls moved to a floating window.');
-}
-function closePip() { if (pipWindow) pipWindow.close(); }
-
-// ---------- Confirmation dialog ----------
-function askConfirm({ title, body, confirmLabel, danger = true }) {
-  const d = els.confirmDialog;
-  if (typeof d.showModal !== 'function') return Promise.resolve(window.confirm(`${title}\n\n${body}`));
-  els.confirmTitle.textContent = title;
-  els.confirmBody.textContent = body;
-  els.confirmOk.textContent = confirmLabel;
-  els.confirmOk.className = `btn ${danger ? 'btn-danger' : 'btn-primary'}`;
-  const opener = document.activeElement;
-  d.returnValue = '';
-  d.showModal();
-  els.confirmCancel.focus(); // the safe choice is the default
-  return new Promise((resolve) => {
-    d.addEventListener('close', () => {
-      const ok = d.returnValue === 'ok';
-      if (!ok && opener && opener.isConnected) opener.focus();
-      resolve(ok);
-    }, { once: true });
-  });
-}
-
-// ---------- Rendering ----------
-function setPhase(next) { phase = next; render(); }
-
-function render() {
-  const live = isLive();
-  const paused = phase === 'paused';
-  const hasMic = !!(rec && rec.micStream);
-
-  els.setupView.hidden = !(phase === 'setup' || phase === 'starting');
-  els.liveSlot.hidden = !live;
-  els.doneView.hidden = phase !== 'done';
-  els.settings.hidden = !canRecord || !(phase === 'setup' || phase === 'starting');
-  els.settingsBody.disabled = phase !== 'setup';
-
-  els.startBtn.disabled = phase !== 'setup' || !canRecord;
-
-  els.recPill.dataset.state = phase;
-  els.recLabel.textContent = paused ? 'Paused' : phase === 'stopping' ? 'Finishing…' : 'Recording';
-
-  els.pauseLabel.textContent = paused ? 'Resume' : 'Pause';
-  els.pauseIcon.hidden = paused;
-  els.resumeIcon.hidden = !paused;
-  els.pauseBtn.disabled = phase === 'stopping';
-
-  els.muteBtn.hidden = !hasMic;
-  els.micMeter.hidden = !hasMic;
-  const muted = !!(rec && rec.muted);
-  els.muteLabel.textContent = muted ? 'Unmute mic' : 'Mute mic';
-  els.muteBtn.classList.toggle('is-active', muted);
-  els.micOnIcon.hidden = muted;
-  els.micOffIcon.hidden = !muted;
-  els.micMeter.classList.toggle('is-muted', muted);
-  els.muteBtn.disabled = phase === 'stopping';
-
-  els.switchBtn.hidden = !canSwitch;
-  els.switchBtn.disabled = switching || phase === 'stopping';
-  els.popoutBtn.hidden = !canPip || !!pipWindow;
-  els.popoutBtn.disabled = phase === 'stopping';
-  els.stopBtn.disabled = phase === 'stopping';
-  els.pipNote.hidden = !pipWindow;
-  els.liveFile.hidden = !(rec && rec.output && !rec.output.failed);
-  els.toolsRow.hidden = !(phase === 'setup' || phase === 'starting');
-  els.repairBtn.disabled = phase !== 'setup';
-  const saving = !!(result && result.saving);
-  els.newBtn.disabled = saving;
-  els.saveLink.setAttribute('aria-disabled', String(saving));
-
-  const showVideo = live || phase === 'done';
-  els.video.hidden = !showVideo;
-  els.stageEmpty.hidden = showVideo;
-  if (!canRecord) {
-    els.stageTitle.textContent = 'Screen recording isn’t available here';
-    els.stageText.textContent = 'Open this page in a recent desktop version of Chrome, Edge, Firefox, or Safari.';
-  } else if (phase === 'starting') {
-    els.stageTitle.textContent = 'Waiting for your selection';
-    els.stageText.textContent = 'Pick a screen, window, or tab in the browser’s dialog.';
-  } else {
-    els.stageTitle.textContent = 'Ready when you are';
-    els.stageText.textContent = 'Start recording, then pick a screen, window, or tab to capture.';
-  }
-  if (!live) document.title = 'Screen Recorder';
-}
-
-// ---------- Keyboard shortcuts ----------
-const SHORTCUTS = [
-  ['KeyR', 'R', 'Start or new recording'],
-  ['KeyP', 'P', 'Pause or resume'],
-  ['KeyM', 'M', 'Mute or unmute mic'],
-  ['KeyS', 'S', 'Stop'],
-];
-function onKeydown(e) {
-  if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.repeat) return;
-  let handled = true;
-  switch (e.code) {
-    case 'KeyR': if (phase === 'setup') startRecording(); else if (phase === 'done') newRecording(); else handled = false; break;
-    case 'KeyP': if (phase === 'recording' || phase === 'paused') togglePause(); else handled = false; break;
-    case 'KeyM': if (rec && rec.micStream) toggleMute(); else handled = false; break;
-    case 'KeyS': if (phase === 'recording' || phase === 'paused') stopRecording(); else handled = false; break;
-    default: handled = false;
-  }
-  if (handled) e.preventDefault();
-}
-function renderShortcuts() {
-  const mod = isMac ? '⌥' : 'Alt';
-  els.shortcutList.replaceChildren(...SHORTCUTS.map(([, key, label]) => {
-    const li = document.createElement('li');
-    const kbd = document.createElement('kbd');
-    kbd.textContent = isMac ? `${mod}${key}` : `${mod}+${key}`;
-    kbd.setAttribute('aria-label', `${isMac ? 'Option' : 'Alt'} ${key}`);
-    li.append(kbd, ` ${label}`);
-    return li;
-  }));
-}
-
-// ---------- WebM parsing ----------
-// WebM is EBML: each element is an ID, a size, then data. IDs and sizes are variable-length integers.
-function ebmlVint(buf, pos, isId) {
-  const first = buf[pos];
-  if (first === undefined || first === 0) return null;
-  let len = 1, mask = 0x80;
-  while (!(first & mask)) { len++; mask >>= 1; }
-  if (pos + len > buf.length) return null;
-  let value = isId ? first : first & (mask - 1);
-  let allOnes = (first & (mask - 1)) === mask - 1;
-  for (let i = 1; i < len; i++) { value = value * 256 + buf[pos + i]; if (buf[pos + i] !== 0xff) allOnes = false; }
-  return { value, len, unknown: !isId && allOnes };
-}
-function readElement(buf, pos) {
-  const id = ebmlVint(buf, pos, true);
-  if (!id) return null;
-  const size = ebmlVint(buf, pos + id.len, false);
-  if (!size) return null;
-  const dataStart = pos + id.len + size.len;
-  return {
-    id: id.value, sizePos: pos + id.len, sizeLen: size.len, size: size.value, unknown: size.unknown,
-    dataStart, end: size.unknown ? Infinity : dataStart + size.value,
-  };
-}
-function readUint(buf, pos, len) {
-  let v = 0;
-  for (let i = 0; i < len; i++) v = v * 256 + buf[pos + i];
-  return v;
-}
-function encodeVint(n, len) {
-  const out = new Uint8Array(len);
-  for (let i = len - 1; i >= 0; i--) { out[i] = n % 256; n = Math.floor(n / 256); }
-  out[0] |= 0x80 >> (len - 1);
-  return out;
-}
-
-const EBML_HEADER = 0x1A45DFA3, SEGMENT = 0x18538067, INFO = 0x1549A966, CLUSTER = 0x1F43B675;
-const TOP_LEVEL_IDS = new Set([CLUSTER, 0x1C53BB6B, 0x1254C367, 0x1043A770, 0x1941A469, 0x114D9B74, INFO, 0x1654AE6B]);
-const CLUSTER_CHILD_IDS = new Set([0xE7, 0xA3, 0xA0, 0xA7, 0xAB, 0xEC, 0x5854, 0xAF]);
-
-// Timestamp (relative to its cluster) of a SimpleBlock or BlockGroup.
-function blockTime(buf, el) {
-  let d = el.dataStart;
-  const end = el.end;
-  if (el.id === 0xA0) {
-    let q = d;
-    d = -1;
-    while (q < end) {
-      const c = readElement(buf, q);
-      if (!c || c.end > end) return null;
-      if (c.id === 0xA1) { d = c.dataStart; break; }
-      q = c.end;
-    }
-    if (d < 0) return null;
-  }
-  const track = ebmlVint(buf, d, false);
-  if (!track || d + track.len + 2 > end) return null;
-  const x = d + track.len;
-  return ((buf[x] << 8) | buf[x + 1]) << 16 >> 16;
-}
-
-// Checks that `i` really starts a cluster (not look-alike bytes inside video data), and finds
-// its last complete block. Returns null if it doesn't parse cleanly.
-function scanCluster(buf, i) {
-  const cl = readElement(buf, i);
-  if (!cl || cl.id !== CLUSTER) return null;
-  const limit = Math.min(buf.length, cl.end);
-  let p = cl.dataStart, ts = null, maxTs = -Infinity, blocks = 0, truncated = false;
-  while (p < limit) {
-    const el = readElement(buf, p);
-    if (!el) { if (buf.length - p < 16) { truncated = true; break; } return null; }
-    if (cl.unknown && TOP_LEVEL_IDS.has(el.id)) break;      // the next top-level element: cluster ended cleanly
-    if (el.unknown) return null;
-    if (el.end > limit) {
-      if (el.end > buf.length && limit === buf.length) { truncated = true; break; } // cut off mid-element
-      return null;
-    }
-    if (el.id === 0xE7) {
-      if (ts !== null || blocks) return null;
-      ts = readUint(buf, el.dataStart, el.size);
-    } else if (el.id === 0xA3 || el.id === 0xA0) {
-      if (ts === null) return null;
-      const rel = blockTime(buf, el);
-      if (rel === null) return null;
-      maxTs = Math.max(maxTs, ts + rel);
-      blocks++;
-    } else if (!CLUSTER_CHILD_IDS.has(el.id)) {
-      return null;
-    }
-    p = el.end;
-  }
-  if (ts === null || !blocks) return null;
-  return {
-    sizePos: cl.sizePos, sizeLen: cl.sizeLen, unknown: cl.unknown, dataStart: cl.dataStart,
-    lastGood: p, truncated: truncated || (!cl.unknown && cl.end > buf.length), maxTs,
-  };
-}
-
-// Repairs a WebM file that was cut off (e.g. by a crash): works out the real duration from the
-// last complete frame, drops any half-written data at the end, and writes the duration into the header.
-async function repairWebm(file) {
-  const NOT_WEBM = 'That doesn’t look like a WebM recording, so it can’t be repaired.';
-  const head = new Uint8Array(await file.slice(0, Math.min(file.size, 1 << 20)).arrayBuffer());
-  let el = readElement(head, 0);
-  if (!el || el.id !== EBML_HEADER || el.unknown) throw new Error(NOT_WEBM);
-  const seg = readElement(head, el.end);
-  if (!seg || seg.id !== SEGMENT) throw new Error(NOT_WEBM);
-
-  let scale = 1e6, firstTs = 0;
-  for (let pos = seg.dataStart; pos < head.length;) {
-    el = readElement(head, pos);
-    if (!el) break;
-    if (el.id === INFO && el.end <= head.length) {
-      for (let q = el.dataStart; q < el.end;) {
-        const c = readElement(head, q);
-        if (!c) break;
-        if (c.id === 0x2AD7B1) scale = readUint(head, c.dataStart, c.size) || 1e6;
-        q = c.end;
-      }
-    }
-    if (el.id === CLUSTER) {
-      const t = readElement(head, el.dataStart);
-      if (t && t.id === 0xE7 && t.end <= head.length) firstTs = readUint(head, t.dataStart, t.size);
-      break;
-    }
-    if (el.unknown) break;
-    pos = el.end;
-  }
-
-  // Find the last cluster by searching backwards from the end of the file.
-  for (let windowSize = 4 << 20; ; windowSize *= 4) {
-    const start = Math.max(0, file.size - windowSize);
-    const buf = new Uint8Array(await file.slice(start, file.size).arrayBuffer());
-    for (let i = buf.length - 4; i >= 0; i--) {
-      if (buf[i] !== 0x1F || buf[i + 1] !== 0x43 || buf[i + 2] !== 0xB6 || buf[i + 3] !== 0x75) continue;
-      const c = scanCluster(buf, i);
-      if (!c) continue;
-
-      const durationMs = Math.max(0, ((c.maxTs - firstTs) * scale) / 1e6);
-      const cutAt = start + c.lastGood;
-      let body = file, trimmedBytes = 0;
-      if (c.truncated) {
-        trimmedBytes = file.size - cutAt;
-        body = c.unknown
-          ? file.slice(0, cutAt)
-          : new Blob([file.slice(0, start + c.sizePos), encodeVint(c.lastGood - c.dataStart, c.sizeLen), file.slice(start + c.sizePos + c.sizeLen, cutAt)]);
-      }
-      const blob = await fixWebmDuration(new Blob([body], { type: 'video/webm' }), durationMs);
-      return { blob, durationMs, trimmedBytes };
-    }
-    if (start === 0 || windowSize >= 256 << 20) throw new Error('No complete video was found in that file, so it can’t be repaired.');
-  }
-}
-
-// ---------- WebM duration fix ----------
-// Browsers write WebM files without a duration, which breaks seeking in many players.
-// This inserts (or updates) the Duration field in the file header. If the file has an
-// unexpected layout it is returned unchanged.
-async function fixWebmDuration(blob, durationMs) {
-  try {
-    const head = new Uint8Array(await blob.slice(0, Math.min(blob.size, 1 << 20)).arrayBuffer());
-    const vint = (pos, isId) => ebmlVint(head, pos, isId);
-    const size8 = (n) => {
-      const out = new Uint8Array(8);
-      out[0] = 0x01;
-      for (let i = 7; i >= 1; i--) { out[i] = n % 256; n = Math.floor(n / 256); }
-      return out;
-    };
-
-    let pos = 0;
-    let id = vint(pos, true);
-    if (!id || id.value !== 0x1A45DFA3) return blob;            // EBML header
-    let size = vint(pos + id.len);
-    if (!size || size.unknown) return blob;
-    pos += id.len + size.len + size.value;
-
-    id = vint(pos, true);
-    if (!id || id.value !== 0x18538067) return blob;            // Segment
-    const segSizePos = pos + id.len;
-    const segSize = vint(segSizePos);
-    if (!segSize) return blob;
-    const segDataStart = segSizePos + segSize.len;
-
-    pos = segDataStart;
-    let info = null;
-    while (pos < head.length) {
-      id = vint(pos, true);
-      size = id && vint(pos + id.len);
-      if (!id || !size || size.unknown) return blob;
-      if (id.value === 0x114D9B74 || id.value === 0x1F43B675) return blob; // SeekHead (offsets would shift) or Cluster before Info
-      if (id.value === 0x1549A966) { info = { sizePos: pos + id.len, size }; break; }
-      pos += id.len + size.len + size.value;
-    }
-    if (!info) return blob;
-    const infoDataStart = info.sizePos + info.size.len;
-    const infoEnd = infoDataStart + info.size.value;
-    if (infoEnd > head.length) return blob;
-
-    let scale = 1e6, durPos = -1, durLen = 0;
-    for (let p = infoDataStart; p < infoEnd;) {
-      const cid = vint(p, true), csz = cid && vint(p + cid.len);
-      if (!cid || !csz) return blob;
-      const data = p + cid.len + csz.len;
-      if (cid.value === 0x2AD7B1) { scale = 0; for (let i = 0; i < csz.value; i++) scale = scale * 256 + head[data + i]; }
-      else if (cid.value === 0x4489) { durPos = data; durLen = csz.value; }
-      p = data + csz.value;
-    }
-    if (!scale) return blob;
-    const duration = (durationMs * 1e6) / scale;
-
-    if (durPos >= 0) {
-      const copy = head.slice(0, infoEnd);
-      const view = new DataView(copy.buffer);
-      if (durLen === 8) view.setFloat64(durPos, duration);
-      else if (durLen === 4) view.setFloat32(durPos, duration);
-      else return blob;
-      return new Blob([copy, blob.slice(infoEnd)], { type: blob.type });
-    }
-
-    const durEl = new Uint8Array(11);
-    durEl.set([0x44, 0x89, 0x88]);
-    new DataView(durEl.buffer).setFloat64(3, duration);
-    const growth = 11 + (8 - info.size.len);
-    return new Blob([
-      head.slice(0, segSizePos),
-      segSize.unknown ? head.slice(segSizePos, segDataStart) : size8(segSize.value + growth),
-      head.slice(segDataStart, info.sizePos),
-      size8(info.size.value + 11),
-      head.slice(infoDataStart, infoEnd),
-      durEl,
-      blob.slice(infoEnd),
-    ], { type: blob.type });
-  } catch (err) {
-    console.warn('Could not fix WebM duration', err);
-    return blob;
-  }
-}
-
-// Fallback for players that still report an unknown duration: seek to the end once.
-els.video.addEventListener('loadedmetadata', () => {
-  if (els.video.srcObject || els.video.duration !== Infinity) return;
-  const restore = () => { els.video.removeEventListener('timeupdate', restore); els.video.currentTime = 0; };
-  els.video.addEventListener('timeupdate', restore);
-  els.video.currentTime = Number.MAX_SAFE_INTEGER;
-});
-
-// ---------- Wiring ----------
-els.startBtn.addEventListener('click', startRecording);
-els.pauseBtn.addEventListener('click', togglePause);
-els.muteBtn.addEventListener('click', toggleMute);
-els.stopBtn.addEventListener('click', stopRecording);
-els.switchBtn.addEventListener('click', switchSource);
-els.popoutBtn.addEventListener('click', openPip);
-els.pipReturnBtn.addEventListener('click', closePip);
-els.newBtn.addEventListener('click', newRecording);
-els.micAccessBtn.addEventListener('click', requestMicAccess);
-els.saveLink.addEventListener('click', (e) => {
-  if (!result || result.saving) { e.preventDefault(); return; }
-  if (canSaveToDisk) { e.preventDefault(); saveCopyWithPicker(); return; }
-  markSaved('download');
-  announce(`Saving ${result.filename} to your downloads.`);
-});
-els.repairBtn.addEventListener('click', () => els.repairInput.click());
-els.repairInput.addEventListener('change', () => {
-  const [file] = els.repairInput.files;
-  els.repairInput.value = '';
-  if (file) repairFile(file);
-});
-els.settings.addEventListener('toggle', () => store.set('settingsOpen', els.settings.open));
-[els.micSelect, els.noiseSuppression, els.echoCancellation, els.leveling, els.systemAudio, ...els.saveModeInputs]
-  .forEach((el) => el.addEventListener('change', saveSettings));
-document.addEventListener('keydown', onKeydown);
-// Leaving the page on purpose discards an unsaved recording, so warn first.
-window.addEventListener('beforeunload', (e) => {
-  if (isLive() || phase === 'starting' || (result && !result.saved) || pendingRecovery) { e.preventDefault(); e.returnValue = ''; }
-});
-// Browser storage is only a safety net for crashes (which fire no events). Once the page is
-// left on purpose, delete what it holds so recordings don't pile up on disk.
-window.addEventListener('pagehide', (e) => {
-  if (e.persisted || !storage.ok) return; // kept in the back/forward cache; the page may come back
-  if (rec && rec.output && rec.output.kind === 'browser') {
-    meta.set(rec.output.name, { discarded: true });
-    storage.worker.postMessage({ type: 'discard', name: rec.output.name });
-  }
-  // A copy saved as a download may still be reading the file; that one is cleaned up next visit.
-  if (result && result.storedName && result.savedVia !== 'download') storage.removeNow(result.storedName);
-  if (pendingRecovery) storage.removeNow(pendingRecovery.name);
-});
-if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
-  navigator.mediaDevices.addEventListener('devicechange', refreshDevices);
-}
-
-// ---------- Init ----------
-loadSettings();
-if (store.get('settings', {}).micId === 'none') els.micSelect.value = 'none';
-updateSettingsSummary();
-renderShortcuts();
-render();
-refreshDevices();
-storage.init().then(() => {
-  applySaveModes();
-  refreshRecovery({ announceFound: true });
-});
-if (!canRecord) {
-  announce('This browser can’t record the screen.', 'error');
-}
-</script>
 </body>
 </html>
