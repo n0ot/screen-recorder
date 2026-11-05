@@ -42,7 +42,7 @@
         <span id="stageText">Start recording, then pick a screen, window, or tab to capture.</span>
       </div>
       <video id="video" playsinline muted hidden aria-label="Screen preview"></video>
-      <div id="stageCountdown" class="stage-countdown" aria-hidden="true" hidden>3</div>
+      <div id="stageToast" class="stage-toast" aria-hidden="true" hidden></div>
     </div>
 
     <div class="panel">
@@ -59,15 +59,6 @@
           <p class="hint">It was kept because the page closed unexpectedly. Save it to keep it. Leaving this page or starting a new recording deletes it.</p>
           <ul id="recoveryList"></ul>
         </section>
-      </section>
-
-      <!-- Countdown -->
-      <section id="countdownView" class="countdown" aria-label="Countdown" hidden>
-        <p>Recording starts in <span id="countdownNum">3</span>…</p>
-        <div class="toolbar">
-          <button id="startNowBtn" class="btn btn-primary" type="button">Start now</button>
-          <button id="cancelCountdownBtn" class="btn btn-secondary" type="button">Cancel</button>
-        </div>
       </section>
 
       <!-- Live -->
@@ -187,6 +178,7 @@
                 <button id="addMarkerHereBtn" class="btn btn-secondary btn-sm" type="button" aria-keyshortcuts="Alt+K">Add marker at current position</button>
                 <button id="copyChaptersBtn" class="btn-link" type="button">Copy chapter list</button>
               </div>
+              <p class="hint">In the player, Shift+← and Shift+→ jump to the previous and next marker.</p>
               <p class="hint">Markers are saved as chapters in the file. VLC and most players show them; QuickTime doesn’t show chapters in MP4 files.</p>
             </div>
           </details>
@@ -261,9 +253,7 @@
                 </select>
               </div>
             </div>
-            <fieldset class="group">
-              <legend>Starting and stopping</legend>
-              <label class="check"><input type="checkbox" id="countdownToggle" checked> <span>Count down from 3 <small>Gives you a moment to switch to what you’re recording</small></span></label>
+            <div class="field">
               <label class="field-label" for="autoStopSelect">Stop automatically after</label>
               <div class="select-wrap">
                 <select id="autoStopSelect">
@@ -274,7 +264,7 @@
                   <option value="120">2 hours</option>
                 </select>
               </div>
-            </fieldset>
+            </div>
             <fieldset class="group" id="savingGroup">
               <legend>While recording, save to</legend>
               <label class="check" id="saveModeBrowserLabel"><input type="radio" name="saveMode" id="saveModeBrowser" value="browser" checked> <span>Browser storage <small>Recommended. Survives crashes; save it when you’re done</small></span></label>
@@ -310,6 +300,8 @@
   <footer class="shortcuts" aria-labelledby="shortcutsHeading">
     <h2 id="shortcutsHeading">Keyboard shortcuts</h2>
     <ul id="shortcutList"></ul>
+    <h2 id="playerShortcutsHeading">In the player</h2>
+    <ul id="playerShortcutList" aria-labelledby="playerShortcutsHeading"></ul>
   </footer>
 </div>
 </body>

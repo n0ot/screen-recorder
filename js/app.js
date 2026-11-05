@@ -4,9 +4,8 @@
 const $ = (id) => document.getElementById(id);
 const els = {
   stage: $('stage'), stageEmpty: $('stageEmpty'), stageTitle: $('stageTitle'), stageText: $('stageText'), video: $('video'),
-  stageCountdown: $('stageCountdown'), installBtn: $('installBtn'),
+  installBtn: $('installBtn'),
   setupView: $('setupView'), startBtn: $('startBtn'),
-  countdownView: $('countdownView'), countdownNum: $('countdownNum'), startNowBtn: $('startNowBtn'), cancelCountdownBtn: $('cancelCountdownBtn'),
   liveSlot: $('liveSlot'), liveControls: $('liveControls'), recPill: $('recPill'), recLabel: $('recLabel'), timer: $('timer'), liveNotes: $('liveNotes'),
   pauseBtn: $('pauseBtn'), pauseLabel: $('pauseLabel'), pauseIcon: $('pauseIcon'), resumeIcon: $('resumeIcon'),
   muteBtn: $('muteBtn'), muteLabel: $('muteLabel'), micOnIcon: $('micOnIcon'), micOffIcon: $('micOffIcon'),
@@ -28,14 +27,14 @@ const els = {
   qualityField: $('qualityField'), qualitySelect: $('qualitySelect'), qualityHint: $('qualityHint'),
   formatSelect: $('formatSelect'), formatHint: $('formatHint'),
   cameraField: $('cameraField'), cameraSelect: $('cameraSelect'), cameraCorner: $('cameraCorner'), cameraHint: $('cameraHint'), cameraAccessBtn: $('cameraAccessBtn'),
-  countdownToggle: $('countdownToggle'), autoStopSelect: $('autoStopSelect'),
+  autoStopSelect: $('autoStopSelect'),
   savingGroup: $('savingGroup'), storageHint: $('storageHint'),
   saveModeBrowserLabel: $('saveModeBrowserLabel'), saveModeFileLabel: $('saveModeFileLabel'), saveModeMemoryLabel: $('saveModeMemoryLabel'),
   saveModeInputs: [...document.querySelectorAll('input[name="saveMode"]')],
   recovery: $('recovery'), recoveryList: $('recoveryList'),
   toolsRow: $('toolsRow'), repairBtn: $('repairBtn'), repairInput: $('repairInput'),
   confirmDialog: $('confirmDialog'), confirmTitle: $('confirmTitle'), confirmBody: $('confirmBody'), confirmOk: $('confirmOk'), confirmCancel: $('confirmCancel'),
-  status: $('status'), shortcutList: $('shortcutList'),
+  status: $('status'), shortcutList: $('shortcutList'), playerShortcutList: $('playerShortcutList'), stageToast: $('stageToast'),
 };
 
 // ---------- Capabilities ----------
@@ -88,7 +87,7 @@ const store = {
 };
 
 // ---------- State ----------
-// phase: setup | starting | countdown | recording | paused | stopping | done
+// phase: setup | starting | recording | paused | stopping | done
 let phase = 'setup';
 let pipWindow = null;
 let switching = false;
@@ -163,7 +162,6 @@ function readSettings() {
     format: currentFormat(),
     cameraId: els.cameraSelect.value || 'none',
     cameraCorner: els.cameraCorner.value || 'br',
-    countdown: els.countdownToggle.checked,
     autoStop: Number(els.autoStopSelect.value) || 0,
     saveMode: currentSaveMode(),
     micVolume: Number(els.micVolume.value),
@@ -206,7 +204,6 @@ function loadSettings() {
   for (const key of ['noiseSuppression', 'echoCancellation', 'leveling', 'systemAudio']) {
     if (typeof s[key] === 'boolean') els[key].checked = s[key];
   }
-  if (typeof s.countdown === 'boolean') els.countdownToggle.checked = s.countdown;
   if (s.recordMode) els.recordModeInputs.forEach((i) => { i.checked = i.value === s.recordMode; });
   if (PRESETS[s.quality]) els.qualitySelect.value = s.quality;
   if (s.autoStop != null) els.autoStopSelect.value = String(s.autoStop);
@@ -875,7 +872,7 @@ async function startRecording() {
     muted: false, cameraVisible: !!camStream,
     elapsed: 0, segmentStart: 0,
     autoStopMs: settings.autoStop ? settings.autoStop * 60_000 : 0,
-    timerId: 0, meterRaf: 0, countdownTimer: 0,
+    timerId: 0, meterRaf: 0,
     warnings,
   };
 
@@ -920,46 +917,11 @@ async function startRecording() {
   }
   startMeter();
 
-  if (settings.countdown) runCountdown();
-  else beginRecording();
-}
-
-function runCountdown() {
-  let n = 3;
-  setPhase('countdown');
-  announce('Recording starts in 3 seconds.');
-  const step = () => {
-    if (!rec || phase !== 'countdown') return;
-    if (n === 0) { beginRecording(); return; }
-    els.countdownNum.textContent = String(n);
-    els.stageCountdown.textContent = String(n);
-    document.title = `Starting in ${n} · Screen Recorder`;
-    n -= 1;
-    rec.countdownTimer = setTimeout(step, 1000);
-  };
-  step();
-  els.startNowBtn.focus();
-}
-
-function cancelCountdown() {
-  if (phase !== 'countdown' || !rec) return;
-  const session = rec;
-  rec = null;
-  clearTimeout(session.countdownTimer);
-  cancelAnimationFrame(session.meterRaf);
-  if (session.pipe) session.pipe.stop();
-  if (session.mixer) session.mixer.close();
-  stopStream(session.display); stopStream(session.micStream); stopStream(session.camStream);
-  discardOutput(session.output);
-  els.video.srcObject = null;
-  setPhase('setup');
-  announce('Recording cancelled.');
-  els.startBtn.focus();
+  beginRecording();
 }
 
 function beginRecording() {
-  if (!rec || (phase !== 'countdown' && phase !== 'starting')) return;
-  clearTimeout(rec.countdownTimer);
+  if (!rec || phase !== 'starting') return;
   rec.recorder.start(1000); // hand data over every second, so nothing is held in one giant chunk
   rec.segmentStart = performance.now();
   rec.timerId = setInterval(tick, 500);
@@ -973,7 +935,6 @@ function beginRecording() {
 function watchDisplayTrack(track) {
   track.onended = () => {
     if (!rec || switching) return;
-    if (phase === 'countdown') { cancelCountdown(); return; }
     announce('Sharing ended, so the recording was stopped.');
     stopRecording();
   };
@@ -1045,9 +1006,7 @@ function addMarker() {
 }
 
 function stopRecording() {
-  if (!rec) return;
-  if (phase === 'countdown') { cancelCountdown(); return; }
-  if (phase === 'stopping') return;
+  if (!rec || phase === 'stopping') return;
   if (phase === 'recording') rec.elapsed += performance.now() - rec.segmentStart;
   setPhase('stopping');
   if (rec.recorder.state !== 'inactive') rec.recorder.stop();
@@ -1213,8 +1172,10 @@ function updateFileMeta() {
 
 function setPlayback(blob) {
   const old = result.url;
+  const rate = els.video.playbackRate; // loading a new source resets the speed
   result.url = URL.createObjectURL(blob);
   els.video.src = result.url;
+  els.video.playbackRate = rate;
   URL.revokeObjectURL(old);
 }
 
@@ -1702,7 +1663,6 @@ function render() {
   const audioOnly = rec ? rec.audioOnly : (result ? result.mediaKind === 'audio' : readSettings().recordMode === 'audio');
 
   els.setupView.hidden = !setup;
-  els.countdownView.hidden = phase !== 'countdown';
   els.liveSlot.hidden = !live;
   els.doneView.hidden = phase !== 'done';
   els.settings.hidden = !canRecord || !setup;
@@ -1748,9 +1708,6 @@ function render() {
   els.micLevel.classList.toggle('is-muted', muted);
   els.tabLevel.hidden = !(mixer && mixer.hasTabAudio);
 
-  // Countdown
-  els.stageCountdown.hidden = phase !== 'countdown';
-
   // Done view
   const r = result;
   const busy = !!(r && r.saving);
@@ -1764,14 +1721,14 @@ function render() {
   els.addMarkerHereBtn.disabled = busy;
 
   // Stage
-  const showVideo = (live || phase === 'countdown') ? !audioOnly : phase === 'done';
+  const showVideo = live ? !audioOnly : phase === 'done';
   els.video.hidden = !showVideo;
-  els.stage.classList.toggle('is-audio', audioOnly && (phase === 'done' || live || phase === 'countdown'));
+  els.stage.classList.toggle('is-audio', audioOnly && (phase === 'done' || live));
   els.stageEmpty.hidden = showVideo && !(audioOnly && phase === 'done');
   if (!canRecord) {
     els.stageTitle.textContent = 'Screen recording isn’t available here';
     els.stageText.textContent = 'Open this page in a recent desktop version of Chrome, Edge, Firefox, or Safari.';
-  } else if (audioOnly && (live || phase === 'countdown')) {
+  } else if (audioOnly && live) {
     els.stageTitle.textContent = 'Recording audio';
     els.stageText.textContent = 'Only sound is being recorded.';
   } else if (audioOnly && phase === 'done') {
@@ -1786,7 +1743,7 @@ function render() {
       ? 'Start recording to capture your microphone and, if you choose, a tab’s audio.'
       : 'Start recording, then pick a screen, window, or tab to capture.';
   }
-  if (!live && phase !== 'countdown') document.title = 'Screen Recorder';
+  if (!live) document.title = 'Screen Recorder';
 }
 
 // ---------- Keyboard shortcuts ----------
@@ -1799,7 +1756,17 @@ const SHORTCUTS = [
   ['KeyS', 'S', 'Stop'],
 ];
 function onKeydown(e) {
-  if (e.key === 'Escape' && phase === 'countdown') { e.preventDefault(); cancelCountdown(); return; }
+  // Escape collapses the expandable panel you're in (Settings, Trim, Markers), or Settings if it's open.
+  if (e.key === 'Escape' && !e.defaultPrevented && !els.confirmDialog.open) {
+    const doc = e.target.ownerDocument || document;
+    const panel = (e.target.closest && e.target.closest('details[open]')) || (els.settings.open && !els.settings.hidden ? els.settings : null);
+    if (panel && panel.ownerDocument === doc) {
+      e.preventDefault();
+      panel.open = false;
+      panel.querySelector('summary').focus();
+      return;
+    }
+  }
   if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.repeat) return;
   const recording = phase === 'recording' || phase === 'paused';
   let handled = true;
@@ -1809,22 +1776,86 @@ function onKeydown(e) {
     case 'KeyM': if (rec && rec.micStream) toggleMute(); else handled = false; break;
     case 'KeyK': if (recording) addMarker(); else if (phase === 'done') addMarkerHere(); else handled = false; break;
     case 'KeyC': if (rec && rec.camStream) toggleCamera(); else handled = false; break;
-    case 'KeyS': if (recording || phase === 'countdown') stopRecording(); else handled = false; break;
+    case 'KeyS': if (recording) stopRecording(); else handled = false; break;
     default: handled = false;
   }
   if (handled) e.preventDefault();
 }
 function renderShortcuts() {
   const mod = isMac ? '⌥' : 'Alt';
-  els.shortcutList.replaceChildren(...SHORTCUTS.filter(([code]) => code !== 'KeyC' || canComposite).map(([, key, label]) => {
+  const item = (keys, label) => {
     const li = document.createElement('li');
-    const kbd = document.createElement('kbd');
-    kbd.textContent = isMac ? `${mod}${key}` : `${mod}+${key}`;
-    kbd.setAttribute('aria-label', `${isMac ? 'Option' : 'Alt'} ${key}`);
-    li.append(kbd, ` ${label}`);
+    keys.forEach(([text, spoken], i) => {
+      if (i) li.append(' ');
+      const kbd = document.createElement('kbd');
+      kbd.textContent = text;
+      kbd.setAttribute('aria-label', spoken);
+      li.append(kbd);
+    });
+    li.append(` ${label}`);
     return li;
-  }));
+  };
+  els.shortcutList.replaceChildren(...SHORTCUTS.filter(([code]) => code !== 'KeyC' || canComposite).map(([, key, label]) =>
+    item([[isMac ? `${mod}${key}` : `${mod}+${key}`, `${isMac ? 'Option' : 'Alt'} ${key}`]], label)));
+  const shift = (k) => (isMac ? `⇧${k}` : `Shift+${k}`);
+  els.playerShortcutList.replaceChildren(
+    item([[shift('<'), 'Shift less than'], [shift('>'), 'Shift greater than']], 'Slower, faster'),
+    item([[shift('←'), 'Shift left arrow'], [shift('→'), 'Shift right arrow']], 'Previous, next marker'),
+  );
 }
+
+// ---------- Player shortcuts (while the player has focus) ----------
+const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+let toastTimer;
+function showToast(text) {
+  els.stageToast.textContent = text;
+  els.stageToast.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { els.stageToast.hidden = true; }, 1200);
+}
+function changeSpeed(dir) {
+  const v = els.video;
+  let i = 0;
+  SPEEDS.forEach((s, k) => { if (Math.abs(s - v.playbackRate) < Math.abs(SPEEDS[i] - v.playbackRate)) i = k; });
+  const next = SPEEDS[Math.min(SPEEDS.length - 1, Math.max(0, i + dir))];
+  v.playbackRate = next;
+  const label = next === 1 ? 'Normal speed' : `${next}× speed`;
+  showToast(next === 1 ? 'Normal speed' : `${next}×`);
+  announce(label + (next === SPEEDS[0] && dir < 0 ? ', the slowest' : next === SPEEDS[SPEEDS.length - 1] && dir > 0 ? ', the fastest' : '') + '.');
+}
+function jumpToMarker(dir) {
+  if (!result) return;
+  const v = els.video;
+  const marks = visibleMarkers()
+    .map((m) => ({ t: (m.ms - result.trimStartMs) / 1000, name: m.name.trim() || 'Marker' }))
+    .sort((a, b) => a.t - b.t);
+  if (!marks.length) { announce('This recording has no markers. Add some in the Markers panel.'); return; }
+  const now = v.currentTime;
+  // Like chapter skipping elsewhere: just after a marker, "previous" goes to the one before it.
+  const target = dir > 0 ? marks.find((m) => m.t > now + 0.25) : [...marks].reverse().find((m) => m.t < now - 1);
+  if (!target) {
+    if (dir < 0) { v.currentTime = 0; showToast('Start'); announce('Start of the recording.'); }
+    else announce('No more markers after this point.');
+    return;
+  }
+  v.currentTime = target.t;
+  const n = marks.indexOf(target) + 1;
+  showToast(target.name);
+  announce(`${target.name}, marker ${n} of ${marks.length}, at ${formatTime(target.t * 1000)}.`);
+}
+function onPlayerKeydown(e) {
+  if (phase !== 'done' || e.altKey || e.ctrlKey || e.metaKey || !e.shiftKey) return false;
+  if (e.code === 'Comma' || e.key === '<') { changeSpeed(-1); return true; }
+  if (e.code === 'Period' || e.key === '>') { changeSpeed(1); return true; }
+  if (e.key === 'ArrowLeft') { jumpToMarker(-1); return true; }
+  if (e.key === 'ArrowRight') { jumpToMarker(1); return true; }
+  return false;
+}
+// Listen on the player itself, in the capture phase, so these win over its built-in arrow keys.
+els.video.addEventListener('keydown', (e) => {
+  if (onPlayerKeydown(e)) { e.preventDefault(); e.stopPropagation(); }
+}, true);
+els.video.setAttribute('aria-keyshortcuts', 'Shift+Comma Shift+Period Shift+ArrowLeft Shift+ArrowRight');
 
 // Fallback for players that still report an unknown duration: seek to the end once.
 els.video.addEventListener('loadedmetadata', () => {
@@ -1836,8 +1867,6 @@ els.video.addEventListener('loadedmetadata', () => {
 
 // ---------- Wiring ----------
 els.startBtn.addEventListener('click', startRecording);
-els.startNowBtn.addEventListener('click', beginRecording);
-els.cancelCountdownBtn.addEventListener('click', cancelCountdown);
 els.pauseBtn.addEventListener('click', togglePause);
 els.muteBtn.addEventListener('click', toggleMute);
 els.cameraBtn.addEventListener('click', toggleCamera);
@@ -1867,7 +1896,7 @@ els.repairInput.addEventListener('change', () => {
 });
 els.settings.addEventListener('toggle', () => store.set('settingsOpen', els.settings.open));
 [els.micSelect, els.noiseSuppression, els.echoCancellation, els.leveling, els.systemAudio, els.qualitySelect, els.formatSelect,
-  els.cameraSelect, els.cameraCorner, els.countdownToggle, els.autoStopSelect, ...els.recordModeInputs, ...els.saveModeInputs]
+  els.cameraSelect, els.cameraCorner, els.autoStopSelect, ...els.recordModeInputs, ...els.saveModeInputs]
   .forEach((el) => el.addEventListener('change', () => { saveSettings(); render(); }));
 for (const [input, key] of [[els.micVolume, 'mic'], [els.tabVolume, 'tab']]) {
   input.addEventListener('input', () => {
@@ -1880,7 +1909,7 @@ document.addEventListener('keydown', onKeydown);
 
 // Leaving the page on purpose discards an unsaved recording, so warn first.
 window.addEventListener('beforeunload', (e) => {
-  if (isLive() || phase === 'starting' || phase === 'countdown' || (result && (!result.saved || result.dirty)) || pendingRecovery) {
+  if (isLive() || phase === 'starting' || (result && (!result.saved || result.dirty)) || pendingRecovery) {
     e.preventDefault();
     e.returnValue = '';
   }

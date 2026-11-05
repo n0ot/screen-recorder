@@ -272,6 +272,7 @@ select {
 /* Footer */
 .shortcuts { color: var(--muted); font-size: 0.875rem; text-align: center; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; }
 .shortcuts h2 { font-size: inherit; font-weight: 600; }
+.shortcuts h2 + ul + h2 { margin-left: 12px; }
 .shortcuts ul { display: contents; }
 .shortcuts li { list-style: none; }
 kbd {
@@ -305,17 +306,16 @@ kbd {
 /* Header actions */
 .header-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 
-/* Countdown */
-.stage-countdown {
-  position: absolute; inset: 0;
-  display: grid; place-items: center;
-  font-size: clamp(4rem, 18vw, 10rem); font-weight: 700; color: #fff;
-  font-variant-numeric: tabular-nums;
-  background: rgb(0 0 0 / 0.35);
-  text-shadow: 0 4px 24px rgb(0 0 0 / 0.5);
+/* Brief notice over the player (playback speed, marker jumps) */
+.stage-toast {
+  position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  padding: 6px 14px; border-radius: 999px;
+  background: rgb(0 0 0 / 0.72); color: #fff;
+  font-weight: 600; font-size: 0.9375rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none;
 }
-.countdown { display: grid; gap: 12px; }
-.countdown p { font-size: 1.0625rem; font-weight: 600; }
 
 /* Audio-only stage */
 .stage.is-audio video { background: transparent; }

@@ -11,7 +11,7 @@ A screen recorder that runs entirely in your browser. Nothing is uploaded: recor
 - Separate volume sliders and level meters for your mic and the tab's audio, adjustable while recording.
 - Audio-only mode, for meetings and voice notes, with much smaller files.
 - A webcam bubble in the corner of your choice, which you can hide and show while recording (Chrome and Edge).
-- A 3-2-1 countdown, and an optional automatic stop after 15 minutes to 2 hours.
+- An optional automatic stop after 15 minutes to 2 hours.
 - Pause and resume, mute the mic, and add markers as you go.
 - Switch to a different screen or tab without stopping (Chrome and Edge).
 - Floating controls that stay visible while you work in other tabs (Chrome and Edge).
@@ -42,7 +42,7 @@ Also: keyboard shortcuts, screen reader support, light and dark mode, works offl
 | Alt+K | Add a marker |
 | Alt+C | Show or hide the webcam bubble |
 | Alt+S | Stop |
-| Escape | Cancel the countdown |
+| Escape | Close the open panel (Settings, Trim, Markers) |
 
 ## Running it locally
 
