@@ -10,7 +10,9 @@ A screen recorder that runs entirely in your browser. Nothing is uploaded: recor
 - Record a screen, window, or tab, with your microphone and the tab's or system audio mixed in.
 - Separate volume sliders and level meters for your mic and the tab's audio, adjustable while recording.
 - Audio-only mode, for meetings and voice notes, with much smaller files.
-- A webcam bubble in the corner of your choice, which you can hide and show while recording (Chrome and Edge).
+- Show up to two windows, tabs, or screens at once, side by side or one above the other, plus a webcam bubble (Chrome and Edge). The layout is chosen automatically to make both as big as possible, and described out loud: where each source is and roughly how big its text will look.
+- **Arrange before recording:** set up your sources and camera and check the layout first. When you start, three short beeps and a long one give you time to switch to what you're recording; recording begins right after the long beep.
+- Add, replace, or remove sources and the camera while recording, swap sides, change the layout, or move the camera to another corner. Hiding the camera keeps it on; removing it turns it off.
 - An optional automatic stop after 15 minutes to 2 hours.
 - Pause and resume, mute the mic, and add markers as you go.
 - Switch to a different screen or tab without stopping (Chrome and Edge).
@@ -36,13 +38,14 @@ Also: keyboard shortcuts, screen reader support, light and dark mode, works offl
 
 | Shortcut (Alt, or Option on a Mac) | Action |
 |---|---|
-| Alt+R | Start recording, or start a new one |
+| Alt+R | Start recording, or start a new one (while arranging: start right away) |
+| Alt+Shift+R | While arranging: count in with beeps, then record |
 | Alt+P | Pause or resume |
 | Alt+M | Mute or unmute the microphone |
 | Alt+K | Add a marker |
 | Alt+C | Show or hide the webcam bubble |
 | Alt+S | Stop |
-| Escape | Close the open panel (Settings, Trim, Markers) |
+| Escape | Close the open panel (Settings, Trim, Markers), or cancel the count-in |
 
 ## Running it locally
 
@@ -66,4 +69,4 @@ Then open http://localhost:8000.
 
 ## Browser support
 
-Recent desktop versions of Chrome, Edge, Firefox, and Safari. The webcam bubble, switching sources, floating controls, and recording straight to a chosen file need Chrome or Edge. Firefox records WebM only.
+Recent desktop versions of Chrome, Edge, Firefox, and Safari. Multiple sources, arranging, the webcam bubble, switching sources, floating controls, and recording straight to a chosen file need Chrome or Edge. Firefox records WebM only.

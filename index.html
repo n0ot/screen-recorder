@@ -53,12 +53,37 @@
             <span class="rec-icon" aria-hidden="true"></span>
             <span>Start recording</span>
           </button>
+          <button id="arrangeBtn" class="btn btn-secondary btn-lg" type="button" aria-describedby="arrangeHint">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="9" height="16" rx="1.5"/><rect x="13" y="4" width="9" height="16" rx="1.5"/></svg>
+            <span>Arrange before recording</span>
+          </button>
         </div>
+        <p id="arrangeHint" class="hint">Arrange lets you share up to two windows or tabs side by side, add your camera, and check the layout before you start.</p>
         <section id="recovery" class="recovery" aria-labelledby="recoveryHeading" hidden>
           <h2 id="recoveryHeading">Unsaved recording found</h2>
           <p class="hint">It was kept because the page closed unexpectedly. Save it to keep it. Leaving this page or starting a new recording deletes it.</p>
           <ul id="recoveryList"></ul>
         </section>
+      </section>
+
+      <!-- Arranging, before recording -->
+      <section id="arrangeView" class="arrange" aria-label="Arrange before recording" hidden>
+        <p class="hint">Add a second source or your camera below if you like. When you start, switch to what you’re recording: you’ll hear three short beeps and a long one, and recording starts right after the long beep.</p>
+        <div class="toolbar">
+          <button id="startArrangedBtn" class="btn btn-primary btn-lg" type="button" aria-keyshortcuts="Alt+Shift+R Alt+R">
+            <span class="rec-icon" aria-hidden="true"></span>
+            <span>Start recording</span>
+          </button>
+          <button id="cancelArrangeBtn" class="btn btn-secondary" type="button">Cancel</button>
+        </div>
+      </section>
+
+      <!-- Count-in -->
+      <section id="countInView" class="arrange" aria-label="Count-in" hidden>
+        <p class="count-in-text">Switch to what you’re recording. Recording starts right after the long beep.</p>
+        <div class="toolbar">
+          <button id="cancelCountInBtn" class="btn btn-secondary" type="button">Cancel</button>
+        </div>
       </section>
 
       <!-- Live -->
@@ -129,6 +154,44 @@
           <button id="pipReturnBtn" class="btn-link" type="button">Bring them back here</button>
         </div>
       </section>
+
+      <!-- Sources and camera: while arranging and recording (Chrome and Edge) -->
+      <details id="sourcesPanel" class="settings" hidden>
+        <summary>Sources and camera <span id="sourcesSummary" class="settings-summary"></span></summary>
+        <div class="settings-body sources-body">
+          <ul id="sourceList" class="source-list" aria-label="Sources"></ul>
+          <div class="toolbar">
+            <button id="addSourceBtn" class="btn btn-secondary btn-sm" type="button">Add a second source</button>
+          </div>
+          <div class="field-row">
+            <label class="field-label" for="layoutSelect">Layout</label>
+            <div class="select-wrap">
+              <select id="layoutSelect">
+                <option value="auto">Automatic</option>
+                <option value="side">Side by side</option>
+                <option value="stacked">One above the other</option>
+              </select>
+            </div>
+            <button id="swapBtn" class="btn btn-secondary btn-sm" type="button">Swap</button>
+          </div>
+          <p id="layoutDescription" class="hint"></p>
+          <div class="field-row" id="cameraRow">
+            <button id="cameraManageBtn" class="btn btn-secondary btn-sm" type="button">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+              <span id="cameraManageLabel">Add camera</span>
+            </button>
+            <label class="field-label" for="liveCorner">Camera corner</label>
+            <div class="select-wrap">
+              <select id="liveCorner">
+                <option value="br">Bottom right</option>
+                <option value="bl">Bottom left</option>
+                <option value="tr">Top right</option>
+                <option value="tl">Top left</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </details>
 
       <!-- Done -->
       <section id="doneView" class="done" aria-labelledby="doneHeading" hidden>

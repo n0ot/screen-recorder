@@ -5,7 +5,12 @@ const $ = (id) => document.getElementById(id);
 const els = {
   stage: $('stage'), stageEmpty: $('stageEmpty'), stageTitle: $('stageTitle'), stageText: $('stageText'), video: $('video'),
   installBtn: $('installBtn'),
-  setupView: $('setupView'), startBtn: $('startBtn'),
+  setupView: $('setupView'), startBtn: $('startBtn'), arrangeBtn: $('arrangeBtn'), arrangeHint: $('arrangeHint'),
+  arrangeView: $('arrangeView'), startArrangedBtn: $('startArrangedBtn'), cancelArrangeBtn: $('cancelArrangeBtn'),
+  countInView: $('countInView'), cancelCountInBtn: $('cancelCountInBtn'),
+  sourcesPanel: $('sourcesPanel'), sourcesSummary: $('sourcesSummary'), sourceList: $('sourceList'), addSourceBtn: $('addSourceBtn'),
+  layoutSelect: $('layoutSelect'), swapBtn: $('swapBtn'), layoutDescription: $('layoutDescription'),
+  cameraManageBtn: $('cameraManageBtn'), cameraManageLabel: $('cameraManageLabel'), liveCorner: $('liveCorner'), cameraRow: $('cameraRow'),
   liveSlot: $('liveSlot'), liveControls: $('liveControls'), recPill: $('recPill'), recLabel: $('recLabel'), timer: $('timer'), liveNotes: $('liveNotes'),
   pauseBtn: $('pauseBtn'), pauseLabel: $('pauseLabel'), pauseIcon: $('pauseIcon'), resumeIcon: $('resumeIcon'),
   muteBtn: $('muteBtn'), muteLabel: $('muteLabel'), micOnIcon: $('micOnIcon'), micOffIcon: $('micOffIcon'),
@@ -87,7 +92,7 @@ const store = {
 };
 
 // ---------- State ----------
-// phase: setup | starting | recording | paused | stopping | done
+// phase: setup | starting | arranging | countin | recording | paused | stopping | done
 let phase = 'setup';
 let pipWindow = null;
 let switching = false;
@@ -528,8 +533,8 @@ function createLimiter(ctx) {
   return { input: comp, output: clip };
 }
 
-// Mixes the microphone and the shared tab/system audio into one track, each with its own volume.
-function createMixer(micStream, displayStream, settings) {
+// Mixes the microphone and the shared tabs' audio into one track, each with its own volume.
+function createMixer(settings) {
   const ctx = new AudioContext();
   const out = ctx.createMediaStreamDestination();
   const limiter = createLimiter(ctx);
@@ -543,10 +548,15 @@ function createMixer(micStream, displayStream, settings) {
   const tabAnalyser = analyser();
   tabBus.connect(dest);
   tabBus.connect(tabAnalyser);
-  let micSrc = null, micAnalyser = null, tabSrc = null;
+  let micSrc = null, micAnalyser = null;
+  const tabSrcs = new Map(); // source id -> audio node
 
-  if (micStream) {
-    micSrc = ctx.createMediaStreamSource(micStream);
+  function setMic(stream) {
+    if (micSrc) micSrc.disconnect();
+    micSrc = null;
+    micAnalyser = null;
+    if (!stream) return;
+    micSrc = ctx.createMediaStreamSource(stream);
     let last = micSrc.connect(micBus);
     if (settings.leveling) {
       // A gentle leveler: keeps quiet and loud speech at a similar volume.
@@ -562,19 +572,18 @@ function createMixer(micStream, displayStream, settings) {
     micAnalyser = analyser();
     last.connect(micAnalyser);
   }
-
-  function setDisplay(stream) {
-    const old = tabSrc;
-    tabSrc = null;
+  function setDisplay(id, stream) {
+    const old = tabSrcs.get(id);
+    tabSrcs.delete(id);
     const [track] = stream ? stream.getAudioTracks() : [];
     if (track) {
-      tabSrc = ctx.createMediaStreamSource(new MediaStream([track]));
-      tabSrc.connect(tabBus);
+      const src = ctx.createMediaStreamSource(new MediaStream([track]));
+      src.connect(tabBus);
+      tabSrcs.set(id, src);
     }
     // Connect the new source before dropping the old one so the output never goes idle.
     if (old) old.disconnect();
   }
-  setDisplay(displayStream);
   ctx.resume().catch(() => {});
 
   const ramp = (param, value) => param.setTargetAtTime(value, ctx.currentTime, 0.03);
@@ -582,11 +591,11 @@ function createMixer(micStream, displayStream, settings) {
     track: out.stream.getAudioTracks()[0],
     get micAnalyser() { return micAnalyser; },
     tabAnalyser,
-    get hasTabAudio() { return !!tabSrc; },
+    get hasTabAudio() { return tabSrcs.size > 0; },
+    setMic,
     setDisplay,
     setMicVolume(pct) { ramp(micBus.gain, (1.5 * pct) / 100); },
     setTabVolume(pct) { ramp(tabBus.gain, (0.7 * pct) / 100); },
-    dropMic() { if (micSrc) micSrc.disconnect(); micSrc = null; micAnalyser = null; },
     close() { ctx.close().catch(() => {}); },
   };
 }
@@ -612,111 +621,540 @@ function drawBubble(ctx, cam, w, h, corner) {
   ctx.stroke();
 }
 
-// Gives MediaRecorder one video track that stays the same while the source behind it changes,
-// and composites the webcam bubble when there is one.
-// With fixedSize, every frame is drawn onto a canvas that keeps the first frame's size (other
-// sizes are letterboxed). MP4 needs this: its H.264 stream can't change resolution part way
-// through, which would otherwise happen when switching sources or resizing a captured window.
-function createVideoPipe(sourceTrack, cameraTrack, corner, { fixedSize = false } = {}) {
-  if (!canComposite) return { track: sourceTrack, setSource: null, setCameraVisible() {}, stop() {} };
-  const compositing = !!cameraTrack || fixedSize;
+// ---------- Layout ----------
+// Fits one or two sources into a W×H frame. Two sources are drawn at the same scale, so text in
+// both shrinks by the same amount, and as large as they'll go. "Automatic" picks side by side or
+// one above the other, whichever lets them be bigger.
+const LAYOUTS = { auto: 'Automatic', side: 'Side by side', stacked: 'One above the other' };
+function computeLayout(sizes, W, H, mode) {
+  const center = (w, h) => ({ x: Math.round((W - w) / 2), y: Math.round((H - h) / 2), w: Math.round(w), h: Math.round(h) });
+  if (sizes.length === 1) {
+    const [a] = sizes;
+    const s = Math.min(W / a.w, H / a.h);
+    return { mode: 'single', scale: s, rects: [center(a.w * s, a.h * s)] };
+  }
+  const [a, b] = sizes;
+  const gap = Math.round(W * 0.01);
+  const side = Math.min((W - gap) / (a.w + b.w), H / Math.max(a.h, b.h));
+  const stacked = Math.min(W / Math.max(a.w, b.w), (H - gap) / (a.h + b.h));
+  const use = mode === 'side' || mode === 'stacked' ? mode : (side >= stacked ? 'side' : 'stacked');
+  const s = use === 'side' ? side : stacked;
+  const aw = a.w * s, ah = a.h * s, bw = b.w * s, bh = b.h * s;
+  let rects;
+  if (use === 'side') {
+    const x0 = (W - (aw + gap + bw)) / 2;
+    rects = [
+      { x: Math.round(x0), y: Math.round((H - ah) / 2), w: Math.round(aw), h: Math.round(ah) },
+      { x: Math.round(x0 + aw + gap), y: Math.round((H - bh) / 2), w: Math.round(bw), h: Math.round(bh) },
+    ];
+  } else {
+    const y0 = (H - (ah + gap + bh)) / 2;
+    rects = [
+      { x: Math.round((W - aw) / 2), y: Math.round(y0), w: Math.round(aw), h: Math.round(ah) },
+      { x: Math.round((W - bw) / 2), y: Math.round(y0 + ah + gap), w: Math.round(bw), h: Math.round(bh) },
+    ];
+  }
+  return { mode: use, scale: s, rects };
+}
 
+// ---------- Compositor ----------
+// Draws up to two sources and the webcam bubble into one frame and gives MediaRecorder a single
+// video track that never changes, whatever happens to the sources behind it. The frame keeps a
+// fixed 16:9 size: MP4's H.264 can't change resolution part way through, and a fixed frame lets
+// sources and the camera come and go during a recording.
+function createCompositor({ width, height, corner, onLayout }) {
   const generator = new MediaStreamTrackGenerator({ kind: 'video' });
   generator.contentHint = 'detail'; // favour sharp text over smooth motion
   const writer = generator.writable.getWriter();
-  let current = 0, stopped = false, writing = false;
-  let latestScreen = null;
-  let cameraVisible = !!cameraTrack, cameraAlive = !!cameraTrack;
-  const canvas = compositing ? new OffscreenCanvas(16, 16) : null;
-  const ctx = canvas ? canvas.getContext('2d', { alpha: false }) : null;
-  let sized = false;
+  const canvas = new OffscreenCanvas(Math.max(2, width & ~1), Math.max(2, height & ~1));
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const W = canvas.width, H = canvas.height;
+  const slots = []; // { id, track, latest, token }
+  let camera = null; // { track, visible, alive, token }
+  let layoutMode = 'auto';
+  let stopped = false, writing = false, pending = false;
+  let lastLayout = null, lastKey = '';
 
-  async function emit(frame) {
-    if (stopped || writing) { frame.close(); return; } // drop a frame if the encoder is behind
-    writing = true;
-    try { await writer.write(frame); } catch { frame.close(); } finally { writing = false; }
-  }
-  // Composited frames get their own steady clock, since screen and camera timestamps differ.
-  function compose(camFrame) {
-    if (!latestScreen) return null;
-    const sw = latestScreen.displayWidth, sh = latestScreen.displayHeight;
-    if (!sized) {
-      // Even dimensions keep H.264 encoders happy.
-      canvas.width = Math.max(2, sw & ~1);
-      canvas.height = Math.max(2, sh & ~1);
-      sized = true;
-    }
-    const W = canvas.width, H = canvas.height;
-    if (sw === W && sh === H) {
-      ctx.drawImage(latestScreen, 0, 0, W, H);
-    } else {
-      const scale = Math.min(W / sw, H / sh);
-      const dw = Math.round(sw * scale), dh = Math.round(sh * scale);
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, 0, W, H);
-      ctx.drawImage(latestScreen, Math.round((W - dw) / 2), Math.round((H - dh) / 2), dw, dh);
-    }
-    if (camFrame && cameraVisible) drawBubble(ctx, camFrame, W, H, corner);
+  function draw(camFrame) {
+    const live = slots.filter((s) => s.latest);
+    if (!live.length) return null;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+    const sizes = live.map((s) => ({ w: s.latest.displayWidth, h: s.latest.displayHeight }));
+    const layout = computeLayout(sizes, W, H, layoutMode);
+    live.forEach((s, i) => { const r = layout.rects[i]; ctx.drawImage(s.latest, r.x, r.y, r.w, r.h); });
+    if (camFrame && camera && camera.visible) drawBubble(ctx, camFrame, W, H, corner);
+    lastLayout = { ...layout, ids: live.map((s) => s.id), sizes, width: W, height: H, requested: layoutMode };
+    // Tell the page when the arrangement changes (not on every frame).
+    const key = `${layoutMode}|${lastLayout.mode}|${lastLayout.ids.join(',')}|${sizes.map((z) => `${Math.round(z.w / 8)}x${Math.round(z.h / 8)}`).join(',')}`;
+    if (key !== lastKey) { lastKey = key; if (onLayout) queueMicrotask(() => onLayout(lastLayout)); }
+    // Composited frames get their own steady clock, since screen and camera timestamps differ.
     return new VideoFrame(canvas, { timestamp: Math.round(performance.now() * 1000) });
   }
+  async function emit(camFrame) {
+    if (stopped) return;
+    if (writing) { pending = true; return; } // the encoder is busy; draw again when it's free
+    const frame = draw(camFrame);
+    if (!frame) return;
+    writing = true;
+    try { await writer.write(frame); } catch { frame.close(); } finally { writing = false; }
+    if (pending && !stopped && !(camera && camera.alive)) { pending = false; emit(null); }
+  }
+  // With a camera, its frames drive the output; otherwise each new screen frame does.
+  function redraw() { if (!(camera && camera.alive)) emit(null); }
 
-  async function pumpScreen(track, id) {
+  async function pumpSlot(slot, track, token) {
     const reader = new MediaStreamTrackProcessor({ track }).readable.getReader();
     try {
       for (;;) {
         const { value: frame, done } = await reader.read();
         if (done) break;
-        if (id !== current || stopped) { frame.close(); break; }
-        if (!compositing) {
-          try { await writer.write(frame); } catch { frame.close(); break; }
-          continue;
-        }
-        if (latestScreen) latestScreen.close();
-        latestScreen = frame;
-        if (!cameraAlive) { const out = compose(null); if (out) await emit(out); }
+        if (slot.token !== token || stopped) { frame.close(); break; }
+        if (slot.latest) slot.latest.close();
+        slot.latest = frame;
+        redraw();
       }
     } catch (err) {
-      console.warn('Screen pipe stopped', err);
+      console.warn('Source stopped', err);
     } finally {
       reader.cancel().catch(() => {});
     }
   }
-  async function pumpCamera() {
-    const reader = new MediaStreamTrackProcessor({ track: cameraTrack }).readable.getReader();
+  async function pumpCamera(cam) {
+    const reader = new MediaStreamTrackProcessor({ track: cam.track }).readable.getReader();
     try {
       for (;;) {
         const { value: frame, done } = await reader.read();
-        if (done || stopped) { if (frame) frame.close(); break; }
-        const out = compose(frame);
+        if (done || stopped || camera !== cam) { if (frame) frame.close(); break; }
+        await emit(frame);
         frame.close();
-        if (out) await emit(out);
       }
     } catch (err) {
-      console.warn('Camera pipe stopped', err);
+      console.warn('Camera stopped', err);
     } finally {
-      cameraAlive = false;
+      cam.alive = false;
       reader.cancel().catch(() => {});
+      redraw();
     }
   }
-  function setSource(track) { current += 1; pumpScreen(track, current); }
-  setSource(sourceTrack);
-  if (cameraTrack) pumpCamera();
 
   return {
     track: generator,
-    setSource,
-    setCameraVisible(v) { cameraVisible = v; },
+    addSource(id, track) {
+      const slot = { id, track, latest: null, token: 1 };
+      slots.push(slot);
+      pumpSlot(slot, track, slot.token);
+    },
+    // Keeps showing the old picture until the new source's first frame arrives.
+    replaceSource(id, track) {
+      const slot = slots.find((s) => s.id === id);
+      if (!slot) return;
+      slot.token += 1;
+      slot.track = track;
+      pumpSlot(slot, track, slot.token);
+    },
+    removeSource(id) {
+      const i = slots.findIndex((s) => s.id === id);
+      if (i < 0) return;
+      const [slot] = slots.splice(i, 1);
+      slot.token += 1;
+      if (slot.latest) slot.latest.close();
+      redraw();
+    },
+    swap() { slots.reverse(); redraw(); },
+    setLayout(mode) { layoutMode = mode; redraw(); },
+    get layoutMode() { return layoutMode; },
+    setCamera(track) {
+      camera = track ? { track, visible: true, alive: true } : null;
+      if (camera) pumpCamera(camera); else redraw();
+    },
+    setCameraVisible(v) { if (camera) camera.visible = v; },
+    setCorner(c) { corner = c; },
+    layoutInfo() { return lastLayout; },
     stop() {
       stopped = true;
-      current += 1;
-      if (latestScreen) { latestScreen.close(); latestScreen = null; }
+      camera = null;
+      for (const s of slots) { s.token += 1; if (s.latest) { s.latest.close(); s.latest = null; } }
       writer.close().catch(() => {});
       generator.stop();
     },
   };
 }
 
+// ---------- Sources ----------
+let sourceSeq = 0;
+function surfaceName(source) {
+  return { browser: 'a tab', window: 'a window', monitor: 'your entire screen' }[source.surface] || 'a shared source';
+}
+function sourceLabel(index, source) { return `Source ${index + 1} (${surfaceName(source)})`; }
+
+// Opens the browser's picker. keepFocus keeps you on this page instead of jumping to what you
+// shared (Chrome), which is what you want while arranging or adding a second source.
+async function pickSource(settings, { keepFocus = false } = {}) {
+  const opts = displayOptions(settings);
+  let controller = null;
+  if (keepFocus && 'CaptureController' in window) { controller = new CaptureController(); opts.controller = controller; }
+  const stream = await navigator.mediaDevices.getDisplayMedia(opts);
+  if (controller) { try { controller.setFocusBehavior('no-focus-change'); } catch { /* not a tab or window */ } }
+  const track = stream.getVideoTracks()[0];
+  track.contentHint = 'detail';
+  const surface = (track.getSettings && track.getSettings().displaySurface) || '';
+  return { id: ++sourceSeq, stream, track, surface };
+}
+
+// How big a source will look, compared with on your screen, if the video is watched full screen
+// on a screen like yours. It's an estimate from pixel sizes: the app can't see the text itself.
+function relativeSize(source, rect, frameW, outputW) {
+  const dpr = window.devicePixelRatio || 1;
+  let nativeW = frameW;
+  try {
+    const caps = source.track.getCapabilities ? source.track.getCapabilities() : null;
+    const max = caps && caps.width && caps.width.max;
+    if (max && max >= frameW && max <= frameW * 4 && max <= 8192) nativeW = max;
+  } catch { /* use the frame size */ }
+  const logicalW = source.surface === 'monitor' ? screen.width : nativeW / dpr;
+  return (rect.w / outputW) * (screen.width / logicalW);
+}
+
+function describeLayout() {
+  if (!rec || !rec.compositor) return '';
+  const info = rec.compositor.layoutInfo();
+  if (!info) return '';
+  const shown = rec.sources.filter((s) => info.ids.includes(s.id));
+  if (!shown.length) return '';
+  const pct = shown.map((s) => {
+    const i = info.ids.indexOf(s.id);
+    return Math.round(relativeSize(s, info.rects[i], info.sizes[i].w, info.width) * 100);
+  });
+  const names = shown.map((s) => sourceLabel(rec.sources.indexOf(s), s).replace(/^Source/, 'source'));
+  const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+  const parts = [];
+  if (shown.length === 2) {
+    const how = info.mode === 'side' ? 'Side by side' : 'One above the other';
+    parts.push(`${how}${info.requested === 'auto' ? ', chosen automatically because it gives them the most room' : ''}.`);
+    parts.push(info.mode === 'side'
+      ? `${cap(names[0])} is on the left and ${names[1]} is on the right.`
+      : `${cap(names[0])} is on top and ${names[1]} is below it.`);
+    parts.push(Math.abs(pct[0] - pct[1]) <= 5
+      ? `Both will look about ${Math.round((pct[0] + pct[1]) / 2)}% as big as they do on your screen.`
+      : `${cap(names[0])} will look about ${pct[0]}% as big as it does on your screen, and ${names[1]} about ${pct[1]}%.`);
+  } else {
+    parts.push(`${cap(names[0])} fills the frame${pct[0] < 100 ? `, and will look about ${pct[0]}% as big as it does on your screen` : ''}.`);
+  }
+  const small = shown.filter((s, i) => pct[i] < 60).map((s) => names[shown.indexOf(s)]);
+  if (small.length) {
+    parts.push(`Text in ${small.join(' and ')} may be hard to read. Making ${small.length > 1 ? 'those windows' : 'that window'} narrower, or ${small.length > 1 ? 'their' : 'its'} text bigger, would help.`);
+  }
+  return parts.join(' ');
+}
+
+function watchSource(source) {
+  source.track.onended = () => {
+    if (!rec || switching || !rec.sources.includes(source)) return;
+    const index = rec.sources.indexOf(source);
+    const label = sourceLabel(index, source);
+    if (rec.sources.length > 1) {
+      removeSourceNow(source);
+      announce(`${label} stopped sharing, so it was removed.${isLive() ? ' Recording continues.' : ''}`);
+    } else if (phase === 'arranging' || phase === 'countin') {
+      cancelArrange(`${label} stopped sharing.`);
+    } else {
+      announce('Sharing ended, so the recording was stopped.');
+      stopRecording();
+    }
+  };
+}
+function removeSourceNow(source) {
+  rec.sources.splice(rec.sources.indexOf(source), 1);
+  if (rec.compositor) rec.compositor.removeSource(source.id);
+  if (rec.mixer) rec.mixer.setDisplay(source.id, null);
+  stopStream(source.stream);
+  renderSources(true);
+  render();
+}
+
+async function addSource() {
+  if (!rec || !rec.compositor || rec.sources.length >= 2 || switching) return;
+  switching = true;
+  render();
+  announce('Choose a second window, tab, or screen. You’ll stay on this page.');
+  try {
+    const s = await pickSource(rec.settings, { keepFocus: true });
+    if (!rec) { stopStream(s.stream); return; }
+    rec.sources.push(s);
+    rec.compositor.addSource(s.id, s.track);
+    if (rec.mixer) rec.mixer.setDisplay(s.id, s.stream);
+    watchSource(s);
+    await layoutIncludes(s.id);
+    renderSources(true);
+    announce(`Added ${sourceLabel(rec.sources.indexOf(s), s).replace(/^Source/, 'source')}. ${describeLayout()}`);
+  } catch (err) {
+    announce(err.name === 'NotAllowedError' ? 'No source was added.' : `Couldn’t add a source: ${err.message || err.name}`,
+      err.name === 'NotAllowedError' ? 'info' : 'error');
+  } finally {
+    switching = false;
+    render();
+  }
+}
+
+async function replaceSource(source) {
+  if (!rec || switching || !rec.sources.includes(source)) return;
+  switching = true;
+  render();
+  const index = rec.sources.indexOf(source);
+  announce(`Choose what to show instead of ${sourceLabel(index, source).replace(/^Source/, 'source')}.`);
+  try {
+    const next = await pickSource(rec.settings, { keepFocus: true });
+    if (!rec || !rec.sources.includes(source)) { stopStream(next.stream); return; }
+    next.id = source.id; // it takes the old one's place in the layout
+    if (rec.compositor) rec.compositor.replaceSource(source.id, next.track);
+    if (rec.mixer) rec.mixer.setDisplay(source.id, next.stream);
+    rec.sources[index] = next;
+    watchSource(next);
+    stopStream(source.stream);
+    if (!rec.compositor && !rec.audioOnly) { els.video.srcObject = next.stream; els.video.play().catch(() => {}); }
+    renderSources(true);
+    announce(`${sourceLabel(index, next)} is now shown.${rec.compositor ? ' ' + describeLayout() : ''}`);
+  } catch (err) {
+    announce(err.name === 'NotAllowedError' ? 'Kept the current source.' : `Couldn’t switch source: ${err.message || err.name}`,
+      err.name === 'NotAllowedError' ? 'info' : 'error');
+  } finally {
+    switching = false;
+    render();
+    const live = rec && rec.sources[index];
+    if (live && live.track.readyState === 'ended' && live.track.onended) live.track.onended();
+  }
+}
+
+function removeSource(source) {
+  if (!rec || rec.sources.length < 2 || !rec.sources.includes(source)) return;
+  const label = sourceLabel(rec.sources.indexOf(source), source);
+  removeSourceNow(source);
+  announce(`${label} removed. ${describeLayout()}`);
+  els.addSourceBtn.focus();
+}
+
+function swapSources() {
+  if (!rec || !rec.compositor || rec.sources.length < 2) return;
+  rec.sources.reverse();
+  rec.compositor.swap();
+  setTimeout(() => { renderSources(true); announce(`Swapped. ${describeLayout()}`); }, 120);
+}
+
+function setLayoutMode(mode) {
+  if (!rec || !rec.compositor) return;
+  rec.compositor.setLayout(mode);
+  store.set('layout', mode);
+  setTimeout(() => { renderSources(); announce(describeLayout()); }, 120);
+}
+
+// Waits (briefly) until a newly added source has been drawn, so its description is accurate.
+function layoutIncludes(id) {
+  return new Promise((resolve) => {
+    const t0 = performance.now();
+    const check = () => {
+      const info = rec && rec.compositor && rec.compositor.layoutInfo();
+      if (!rec || (info && info.ids.includes(id)) || performance.now() - t0 > 3000) resolve();
+      else setTimeout(check, 50);
+    };
+    check();
+  });
+}
+
+// --- Camera, while arranging or recording ---
+async function addCamera() {
+  if (!rec || !rec.compositor || rec.camStream || switching) return;
+  switching = true;
+  render();
+  try {
+    const s = { ...rec.settings, cameraId: rec.settings.cameraId === 'none' ? 'default' : rec.settings.cameraId };
+    const cam = await getCamera(s);
+    if (!rec) { stopStream(cam); return; }
+    attachCamera(cam);
+    refreshDevices();
+    announce(`Camera added in the ${cornerName(rec.corner)} corner.`);
+  } catch (err) {
+    announce(err.name === 'NotAllowedError' ? 'Camera access was blocked.' : `Couldn’t open the camera: ${err.message || err.name}`, 'error');
+  } finally {
+    switching = false;
+    render();
+    renderSources();
+  }
+}
+function attachCamera(cam) {
+  rec.camStream = cam;
+  rec.cameraVisible = true;
+  rec.compositor.setCamera(cam.getVideoTracks()[0]);
+  cam.getVideoTracks()[0].onended = () => {
+    if (!rec || rec.camStream !== cam) return;
+    rec.camStream = null;
+    rec.compositor.setCamera(null);
+    render();
+    renderSources();
+    announce('The camera was disconnected.', 'warn');
+  };
+}
+function removeCamera() {
+  if (!rec || !rec.camStream) return;
+  const cam = rec.camStream;
+  rec.camStream = null;
+  rec.compositor.setCamera(null);
+  stopStream(cam); // turns the camera (and its light) off
+  render();
+  renderSources();
+  announce('Camera removed and turned off.');
+  els.cameraManageBtn.focus();
+}
+function toggleCamera() {
+  if (!rec || !rec.camStream || !rec.compositor) return;
+  rec.cameraVisible = !rec.cameraVisible;
+  rec.compositor.setCameraVisible(rec.cameraVisible);
+  render();
+  announce(rec.cameraVisible ? 'Camera shown.' : 'Camera hidden. It’s still on, so you can show it again right away.');
+}
+function cornerName(c) { return { br: 'bottom right', bl: 'bottom left', tr: 'top right', tl: 'top left' }[c] || 'bottom right'; }
+function setCameraCorner(c) {
+  if (!rec || !rec.compositor) return;
+  rec.corner = c;
+  rec.compositor.setCorner(c);
+  announce(`Camera moved to the ${cornerName(c)} corner.`);
+}
+
+function renderSources(rebuild = false) {
+  const has = !!(rec && rec.compositor);
+  if (!has) return;
+  if (rebuild || els.sourceList.children.length !== rec.sources.length) {
+    els.sourceList.replaceChildren(...rec.sources.map((src, i) => {
+      const li = document.createElement('li');
+      const text = document.createElement('span');
+      text.className = 'source-name';
+      const detail = document.createElement('span');
+      detail.className = 'source-detail';
+      text.append(sourceLabel(i, src));
+      const actions = document.createElement('div');
+      actions.className = 'recovery-actions';
+      const replace = document.createElement('button');
+      replace.type = 'button';
+      replace.className = 'btn btn-secondary btn-sm';
+      replace.textContent = 'Replace';
+      replace.setAttribute('aria-label', `Replace ${sourceLabel(i, src)}`);
+      replace.addEventListener('click', () => replaceSource(src));
+      actions.append(replace);
+      if (rec.sources.length > 1) {
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'btn-link is-danger';
+        remove.textContent = 'Remove';
+        remove.setAttribute('aria-label', `Remove ${sourceLabel(i, src)}`);
+        remove.addEventListener('click', () => removeSource(src));
+        actions.append(remove);
+      }
+      const info = document.createElement('div');
+      info.className = 'recovery-info';
+      info.append(text, detail);
+      li.append(info, actions);
+      return li;
+    }));
+  }
+  // Sizes change as windows are resized, so these update in place.
+  const info = rec.compositor.layoutInfo();
+  [...els.sourceList.querySelectorAll('.source-detail')].forEach((el, i) => {
+    const src = rec.sources[i];
+    const j = info ? info.ids.indexOf(src.id) : -1;
+    if (j < 0) { el.textContent = 'Waiting for its first picture…'; return; }
+    const pct = Math.round(relativeSize(src, info.rects[j], info.sizes[j].w, info.width) * 100);
+    el.textContent = `${info.sizes[j].w} × ${info.sizes[j].h} pixels · looks about ${pct}% as big as on your screen${pct < 60 ? ' · text may be hard to read' : ''}`;
+  });
+  els.layoutDescription.textContent = rec.sources.length > 1 ? describeLayout() : 'Add a second source to show two things at once.';
+  els.layoutSelect.value = rec.compositor.layoutMode;
+  els.sourcesSummary.textContent = `${rec.sources.length} source${rec.sources.length === 1 ? '' : 's'}${rec.camStream ? ' and camera' : ''}`;
+  els.cameraManageLabel.textContent = rec.camStream ? 'Remove camera' : 'Add camera';
+  els.liveCorner.value = rec.corner;
+}
+
 // ---------- Recording flow ----------
+// A session holds everything that's being captured; the recorder is added when recording starts.
+function createSession(settings, sources) {
+  const audioOnly = settings.recordMode === 'audio';
+  const session = {
+    settings, audioOnly, sources, corner: settings.cameraCorner,
+    compositor: null, mixer: null, micStream: null, camStream: null, cameraVisible: false,
+    recorder: null, output: null, mimeType: '', filename: '',
+    chunks: [], markers: [], muted: false,
+    elapsed: 0, segmentStart: 0, autoStopMs: settings.autoStop ? settings.autoStop * 60_000 : 0,
+    timerId: 0, meterRaf: 0, countIn: null, warnings: [], arranged: false,
+  };
+  if (!audioOnly && canComposite) {
+    const preset = PRESETS[settings.quality];
+    session.compositor = createCompositor({
+      width: preset.width, height: preset.height, corner: session.corner,
+      onLayout: () => { if (rec === session) renderSources(); },
+    });
+    session.compositor.setLayout(store.get('layout', 'auto'));
+    for (const s of sources) session.compositor.addSource(s.id, s.track);
+  }
+  if (audioOnly || settings.systemAudio || settings.micId !== 'none') {
+    session.mixer = createMixer(settings);
+    for (const s of sources) session.mixer.setDisplay(s.id, s.stream);
+  }
+  for (const s of sources) watchSource(s);
+  return session;
+}
+
+function teardownCapture(session) {
+  if (session.countIn) { session.countIn.close().catch(() => {}); session.countIn = null; }
+  if (session.compositor) session.compositor.stop();
+  if (session.mixer) session.mixer.close();
+  for (const s of session.sources) stopStream(s.stream);
+  stopStream(session.micStream);
+  stopStream(session.camStream);
+}
+
+function showPreview(session) {
+  els.video.removeAttribute('src');
+  els.video.controls = false;
+  els.video.muted = true;
+  if (session.audioOnly) { els.video.srcObject = null; return; }
+  els.video.srcObject = session.compositor ? new MediaStream([session.compositor.track])
+    : (session.sources[0] ? session.sources[0].stream : null);
+  els.video.play().catch(() => {});
+}
+
+async function confirmReplacingRecovery() {
+  if (!pendingRecovery) return true;
+  const old = pendingRecovery;
+  const ok = await askConfirm({
+    title: 'Delete the unsaved recording?',
+    body: `Only one recording is kept in this browser, so starting a new one deletes the unsaved recording from ${old.when}.`,
+    confirmLabel: 'Delete and start recording',
+  });
+  if (!ok) return false;
+  pendingRecovery = null;
+  els.recovery.hidden = true;
+  storage.remove(old.name); // not awaited: the next picker needs to open while the click still counts
+  return true;
+}
+
+function recordingFilename(settings) {
+  const fmt = FORMATS[settings.format];
+  return `${fileStem(new Date())}.${settings.recordMode === 'audio' ? fmt.audioExt : fmt.videoExt}`;
+}
+
+// Opens the save dialog when saving to a chosen file. Returns false if the user cancelled.
+async function openFileOutputIfNeeded(settings, filename, warnings) {
+  if (settings.saveMode !== 'file' || !canSaveToDisk) return { ok: true, output: null };
+  announce('Choose where to save the recording.');
+  try {
+    return { ok: true, output: await openOutputFile(filename) };
+  } catch (err) {
+    if (err.name === 'AbortError') return { ok: false };
+    console.warn('Could not open output file', err);
+    warnings.push('Couldn’t open a file to save into, so the recording is kept in memory until you save it.');
+    return { ok: true, output: null };
+  }
+}
+
+// Start recording right away (one source, or audio only).
 async function startRecording() {
   if (phase !== 'setup' || !canRecord) return;
   const settings = readSettings();
@@ -727,58 +1165,21 @@ async function startRecording() {
     els.micSelect.focus();
     return;
   }
-  if (pendingRecovery) {
-    const old = pendingRecovery;
-    const ok = await askConfirm({
-      title: 'Delete the unsaved recording?',
-      body: `Only one recording is kept in this browser, so starting a new one deletes the unsaved recording from ${old.when}.`,
-      confirmLabel: 'Delete and start recording',
-    });
-    if (!ok || phase !== 'setup') return;
-    pendingRecovery = null;
-    els.recovery.hidden = true;
-    storage.remove(old.name); // not awaited: the screen picker needs to open while the click still counts
-  }
-
-  const stem = fileStem(new Date());
-  const fmt = FORMATS[settings.format];
-  const mimeType = supportedMime(settings.format, settings.recordMode);
-  const ext = audioOnly ? fmt.audioExt : fmt.videoExt;
-  const filename = `${stem}.${ext}`;
-  const warnings = [];
+  if (!(await confirmReplacingRecovery()) || phase !== 'setup') return;
   setPhase('starting');
+  const filename = recordingFilename(settings);
+  const warnings = [];
+  const file = await openFileOutputIfNeeded(settings, filename, warnings);
+  if (!file.ok) { setPhase('setup'); announce('Recording not started, because no save location was chosen.'); els.startBtn.focus(); return; }
 
-  let mode = settings.saveMode;
-  if (mode === 'browser' && !storage.ok) mode = 'memory';
-  if (mode === 'file' && !canSaveToDisk) mode = 'memory';
-
-  // Ask for the file first: the save dialog needs the click that just happened.
-  let output = null;
-  if (mode === 'file') {
-    announce('Choose where to save the recording.');
-    try {
-      output = await openOutputFile(filename);
-    } catch (err) {
-      if (err.name === 'AbortError') {
-        setPhase('setup');
-        announce('Recording not started, because no save location was chosen.');
-        els.startBtn.focus();
-        return;
-      }
-      console.warn('Could not open output file', err);
-      warnings.push('Couldn’t open a file to save into, so the recording is kept in memory until you save it.');
-    }
-  }
-
-  // The screen picker (skipped for microphone-only recordings).
-  let display = null;
+  const sources = [];
   if (!audioOnly || settings.systemAudio) {
     announce(audioOnly ? 'Choose a tab or screen to record its audio.' : 'Choose a screen, window, or tab to record.');
     try {
-      display = await navigator.mediaDevices.getDisplayMedia(displayOptions(settings));
+      sources.push(await pickSource(settings));
     } catch (err) {
       console.warn('getDisplayMedia failed', err);
-      discardOutput(output);
+      discardOutput(file.output);
       setPhase('setup');
       if (err.name === 'NotAllowedError') announce('Selection was cancelled. Nothing was recorded.');
       else if (err.name === 'NotFoundError') announce('No screen, window, or tab is available to record.', 'error');
@@ -787,13 +1188,81 @@ async function startRecording() {
       return;
     }
   }
-  const videoTrack = display ? display.getVideoTracks()[0] : null;
-  if (videoTrack) videoTrack.contentHint = 'detail';
+  rec = createSession(settings, sources);
+  rec.filename = filename;
+  rec.output = file.output;
+  rec.warnings = warnings;
+  showPreview(rec);
+  startMeter();
+  await prepareRecording(rec, { countIn: false });
+}
 
-  // Browser storage is opened after the screen picker, which some browsers only allow right after a click.
+// Arrange first: add up to two sources and the camera, preview the result, then start.
+async function arrangeSources() {
+  if (phase !== 'setup' || !canComposite) return;
+  const settings = readSettings();
+  if (settings.recordMode === 'audio') return;
+  setPhase('starting');
+  announce('Choose the first window, tab, or screen. You’ll stay on this page so you can arrange things.');
+  let first;
+  try {
+    first = await pickSource(settings, { keepFocus: true });
+  } catch (err) {
+    setPhase('setup');
+    announce(err.name === 'NotAllowedError' ? 'Nothing was shared.' : `Couldn’t start capturing: ${err.message || err.name}`,
+      err.name === 'NotAllowedError' ? 'info' : 'error');
+    els.arrangeBtn.focus();
+    return;
+  }
+  rec = createSession(settings, [first]);
+  rec.arranged = true;
+  if (settings.cameraId !== 'none') {
+    try { attachCamera(await getCamera(settings)); } catch (err) { console.warn('Camera failed', err); }
+  }
+  showPreview(rec);
+  startMeter();
+  setPhase('arranging');
+  els.sourcesPanel.open = true;
+  await layoutIncludes(first.id);
+  if (rec === null || phase !== 'arranging') return; // already started or cancelled
+  renderSources(true);
+  announce(`Sharing ${surfaceName(first)}. Add a second source if you like, then start recording. After you press Start recording, switch to what you’re recording: you’ll hear three short beeps and a long one, and recording starts right after the long beep.`);
+  els.addSourceBtn.focus();
+}
+
+function cancelArrange(reason = '') {
+  if (!rec || !(phase === 'arranging' || phase === 'countin' || (phase === 'starting' && rec.arranged))) return;
+  const session = rec;
+  rec = null;
+  cancelAnimationFrame(session.meterRaf);
+  teardownCapture(session);
+  discardOutput(session.output);
+  els.video.srcObject = null;
+  setPhase('setup');
+  announce(`${reason ? reason + ' ' : ''}Nothing was recorded.`.trim());
+  els.startBtn.focus();
+}
+
+async function startArranged({ countIn = true } = {}) {
+  if (phase !== 'arranging' || !rec) return;
+  if (!(await confirmReplacingRecovery()) || phase !== 'arranging') return;
+  const session = rec;
+  session.filename = recordingFilename(session.settings);
+  setPhase('starting');
+  const file = await openFileOutputIfNeeded(session.settings, session.filename, session.warnings);
+  if (!file.ok) { setPhase('arranging'); announce('Recording not started, because no save location was chosen.'); els.startArrangedBtn.focus(); return; }
+  session.output = file.output;
+  await prepareRecording(session, { countIn });
+}
+
+// Opens the microphone and storage, creates the recorder, then starts (or counts in).
+async function prepareRecording(session, { countIn }) {
+  const { settings, warnings } = session;
+  let mode = settings.saveMode;
+  if (mode === 'browser' && !storage.ok) mode = 'memory';
   if (mode === 'browser') {
     try {
-      output = await openBrowserOutput(filename);
+      session.output = await openBrowserOutput(session.filename);
       const low = await lowSpaceWarning();
       if (low) warnings.push(low);
       if (navigator.storage.persist) navigator.storage.persist().catch(() => {});
@@ -802,13 +1271,19 @@ async function startRecording() {
       warnings.push('Couldn’t use browser storage, so the recording is kept in memory until you save it.');
     }
   }
-
-  let micStream = null;
   if (settings.micId !== 'none') {
     try {
       const mic = await getMic(settings);
-      micStream = mic.stream;
+      session.micStream = mic.stream;
       if (mic.fellBack) warnings.push('The chosen microphone wasn’t available, so the default one is being used.');
+      if (session.mixer) session.mixer.setMic(mic.stream);
+      mic.stream.getAudioTracks()[0].onended = () => {
+        if (rec !== session) return;
+        if (session.mixer) session.mixer.setMic(null);
+        session.micStream = null;
+        render();
+        announce('The microphone was disconnected. Recording continues without it.', 'warn');
+      };
     } catch (err) {
       console.warn('Microphone failed', err);
       warnings.push(err.name === 'NotAllowedError'
@@ -816,128 +1291,132 @@ async function startRecording() {
         : 'No microphone could be opened, so it isn’t being recorded.');
     }
   }
-  let camStream = null;
-  if (!audioOnly && canComposite && settings.cameraId !== 'none') {
-    try { camStream = await getCamera(settings); }
+  if (!session.arranged && session.compositor && settings.cameraId !== 'none' && !session.camStream) {
+    try { attachCamera(await getCamera(settings)); }
     catch (err) {
       console.warn('Camera failed', err);
       warnings.push(err.name === 'NotAllowedError' ? 'Camera access was blocked, so the camera isn’t shown.' : 'The camera couldn’t be opened, so it isn’t shown.');
     }
   }
   refreshDevices(); // labels become available once permission is granted
-  if (settings.systemAudio && display && display.getAudioTracks().length === 0) {
-    warnings.push('This source didn’t share audio. To include it, pick a tab and turn on “Share tab audio”.');
+  const first = session.sources[0];
+  if (settings.systemAudio && first && !session.sources.some((s) => s.stream.getAudioTracks().length)) {
+    warnings.push('What you shared didn’t include audio. To record a tab’s sound, pick a tab and turn on “Share tab audio”.');
   }
 
   const fail = (message) => {
-    stopStream(display); stopStream(micStream); stopStream(camStream);
-    discardOutput(output);
+    rec = null;
+    cancelAnimationFrame(session.meterRaf);
+    teardownCapture(session);
+    discardOutput(session.output);
+    els.video.srcObject = null;
     setPhase('setup');
     announce(message, 'error');
     els.startBtn.focus();
   };
-  if (videoTrack && videoTrack.readyState === 'ended') return fail('Screen sharing ended before recording started.');
-  if (audioOnly && !micStream && !(display && display.getAudioTracks().length)) {
+  if (rec !== session) { teardownCapture(session); discardOutput(session.output); return; }
+  if (first && first.track.readyState === 'ended' && session.sources.length === 1) return fail('Sharing ended before recording started.');
+  if (session.audioOnly && !session.micStream && !session.sources.some((s) => s.stream.getAudioTracks().length)) {
     return fail('There’s no audio to record: no microphone could be opened and the source didn’t share audio.');
   }
 
-  const wantsAudio = audioOnly || !!micStream || settings.systemAudio;
-  const mixer = wantsAudio ? createMixer(micStream, display, settings) : null;
-  const pipe = audioOnly ? null : createVideoPipe(videoTrack, camStream ? camStream.getVideoTracks()[0] : null, settings.cameraCorner,
-    { fixedSize: (mimeType || '').includes('mp4') });
-  const tracks = audioOnly ? [mixer.track] : (mixer ? [pipe.track, mixer.track] : [pipe.track]);
-  const stream = new MediaStream(tracks);
-
+  const fmt = FORMATS[settings.format];
+  const mimeType = supportedMime(settings.format, settings.recordMode);
+  const videoTrack = session.compositor ? session.compositor.track : (first ? first.track : null);
+  const tracks = session.audioOnly ? [session.mixer.track] : [videoTrack, ...(session.mixer ? [session.mixer.track] : [])];
   const preset = PRESETS[settings.quality];
   const options = { audioBitsPerSecond: preset.audio };
   if (mimeType) options.mimeType = mimeType;
-  if (!audioOnly) {
+  if (!session.audioOnly) {
     options.videoBitsPerSecond = Math.round(preset.video * fmt.bitrate);
     options.videoKeyFrameIntervalDuration = 1000; // a keyframe every second makes trimming precise
   }
-  let recorder;
   try {
-    recorder = new MediaRecorder(stream, options);
+    session.recorder = new MediaRecorder(new MediaStream(tracks), options);
   } catch (err) {
     console.error(err);
-    if (pipe) pipe.stop();
-    if (mixer) mixer.close();
     return fail(`This browser couldn’t start a recording: ${err.message || err.name}`);
   }
-
-  const session = rec = {
-    recorder, display, micStream, camStream, mixer, pipe, mimeType, output, settings, audioOnly,
-    chunks: [], markers: [],
-    filename,
-    muted: false, cameraVisible: !!camStream,
-    elapsed: 0, segmentStart: 0,
-    autoStopMs: settings.autoStop ? settings.autoStop * 60_000 : 0,
-    timerId: 0, meterRaf: 0,
-    warnings,
-  };
-
-  recorder.ondataavailable = (e) => {
+  session.mimeType = mimeType;
+  session.recorder.ondataavailable = (e) => {
     if (!e.data || !e.data.size) return;
     if (session.output) writeChunk(session, e.data);
     else session.chunks.push(e.data);
   };
-  recorder.onstop = finalizeRecording;
-  recorder.onerror = (e) => {
+  session.recorder.onstop = finalizeRecording;
+  session.recorder.onerror = (e) => {
     console.error('MediaRecorder error', e.error || e);
     announce(`Recording error: ${(e.error && e.error.message) || 'unknown problem'}. Saving what was captured.`, 'error');
     stopRecording();
   };
 
-  if (videoTrack) watchDisplayTrack(videoTrack);
-  if (micStream) {
-    micStream.getAudioTracks()[0].onended = () => {
-      if (!rec) return;
-      if (rec.mixer) rec.mixer.dropMic();
-      rec.micStream = null;
-      render();
-      announce('The microphone was disconnected. Recording continues without it.', 'warn');
-    };
-  }
-  if (camStream) {
-    camStream.getVideoTracks()[0].onended = () => {
-      if (!rec) return;
-      rec.camStream = null;
-      render();
-      announce('The camera was disconnected. Recording continues without it.', 'warn');
-    };
-  }
+  if (countIn) runCountIn(session);
+  else beginRecording();
+}
 
-  els.video.removeAttribute('src');
-  els.video.controls = false;
-  els.video.muted = true;
-  if (!audioOnly) {
-    // Preview what's actually recorded when it's composited (camera bubble or letterboxing).
-    els.video.srcObject = pipe.track !== videoTrack ? new MediaStream([pipe.track]) : display;
-    els.video.play().catch(() => {});
-  }
-  startMeter();
+// Three short beeps and a long one, played through this page (not recorded). Recording starts
+// the moment the long beep ends, so the beeps aren't in the recording. Timing comes from the
+// audio clock, which keeps time even while you're on another tab.
+function runCountIn(session) {
+  setPhase('countin');
+  announce('Switch to what you’re recording now. Recording starts right after the long beep.');
+  const ctx = new AudioContext();
+  session.countIn = ctx;
+  const t0 = ctx.currentTime + 0.6;
+  const tone = (at, freq, dur) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, at);
+    gain.gain.linearRampToValueAtTime(0.35, at + 0.01);
+    gain.gain.setValueAtTime(0.35, at + dur - 0.03);
+    gain.gain.linearRampToValueAtTime(0, at + dur);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(at);
+    osc.stop(at + dur);
+    return osc;
+  };
+  for (let i = 0; i < 3; i++) tone(t0 + i, 660, 0.15);
+  const last = tone(t0 + 3, 990, 0.7);
+  last.onended = () => {
+    if (session.countIn !== ctx) return;
+    session.countIn = null;
+    ctx.close().catch(() => {});
+    if (rec === session && phase === 'countin') beginRecording();
+  };
+  ctx.resume().catch(() => {});
+  els.cancelCountInBtn.focus();
+}
 
-  beginRecording();
+function cancelCountIn() {
+  if (phase !== 'countin' || !rec) return;
+  const session = rec;
+  if (session.countIn) { session.countIn.close().catch(() => {}); session.countIn = null; }
+  // Go back to arranging, keeping the sources; drop what was opened for recording.
+  session.recorder = null;
+  discardOutput(session.output);
+  session.output = null;
+  if (session.mixer) session.mixer.setMic(null);
+  stopStream(session.micStream);
+  session.micStream = null;
+  session.warnings = [];
+  setPhase('arranging');
+  announce('Count-in cancelled. Nothing was recorded.');
+  els.startArrangedBtn.focus();
 }
 
 function beginRecording() {
-  if (!rec || phase !== 'starting') return;
+  if (!rec || !rec.recorder || !(phase === 'starting' || phase === 'countin')) return;
   rec.recorder.start(1000); // hand data over every second, so nothing is held in one giant chunk
   rec.segmentStart = performance.now();
   rec.timerId = setInterval(tick, 500);
   setPhase('recording');
   tick();
+  renderSources(true);
   const w = rec.warnings;
   announce(['Recording started.', ...w].join(' '), w.length ? 'warn' : 'info');
   els.pauseBtn.focus();
-}
-
-function watchDisplayTrack(track) {
-  track.onended = () => {
-    if (!rec || switching) return;
-    announce('Sharing ended, so the recording was stopped.');
-    stopRecording();
-  };
 }
 
 function elapsedMs() {
@@ -989,14 +1468,6 @@ function toggleMute() {
   announce(rec.muted ? 'Microphone muted.' : 'Microphone on.');
 }
 
-function toggleCamera() {
-  if (!rec || !rec.camStream || !rec.pipe) return;
-  rec.cameraVisible = !rec.cameraVisible;
-  rec.pipe.setCameraVisible(rec.cameraVisible);
-  render();
-  announce(rec.cameraVisible ? 'Camera shown.' : 'Camera hidden.');
-}
-
 function addMarker() {
   if (!rec || !(phase === 'recording' || phase === 'paused')) return;
   const ms = elapsedMs();
@@ -1020,11 +1491,7 @@ async function finalizeRecording() {
   clearInterval(session.timerId);
   cancelAnimationFrame(session.meterRaf);
   closePip();
-  if (session.pipe) session.pipe.stop();
-  if (session.mixer) session.mixer.close();
-  stopStream(session.display);
-  stopStream(session.micStream);
-  stopStream(session.camStream);
+  teardownCapture(session);
   document.title = 'Screen Recorder';
 
   const durationMs = session.elapsed + (phase === 'recording' ? performance.now() - session.segmentStart : 0);
@@ -1102,37 +1569,10 @@ async function finalizeRecording() {
   }, onDisk ? 'Saved to your computer' : 'Your recording is ready', message, warning ? 'warn' : 'info');
 }
 
+// Audio-only recordings of a tab can switch to a different tab.
 async function switchSource() {
-  if (!rec || !rec.display || switching || !(phase === 'recording' || phase === 'paused')) return;
-  if (!rec.audioOnly && !(rec.pipe && rec.pipe.setSource)) return;
-  switching = true;
-  render();
-  announce('Choose a new source. The recording keeps going.');
-  try {
-    const next = await navigator.mediaDevices.getDisplayMedia(displayOptions(rec.settings));
-    if (!rec) { stopStream(next); return; }
-    const [track] = next.getVideoTracks();
-    track.contentHint = 'detail';
-    if (rec.pipe) rec.pipe.setSource(track);
-    if (rec.mixer) rec.mixer.setDisplay(next);
-    const old = rec.display;
-    rec.display = next;
-    watchDisplayTrack(track);
-    stopStream(old);
-    if (!rec.audioOnly && rec.pipe && rec.pipe.track === track) {
-      els.video.srcObject = next;
-      els.video.play().catch(() => {});
-    }
-    announce('Now recording the new source.');
-  } catch (err) {
-    announce(err.name === 'NotAllowedError' ? 'Kept recording the current source.' : `Couldn’t switch source: ${err.message || err.name}`,
-      err.name === 'NotAllowedError' ? 'info' : 'error');
-  } finally {
-    switching = false;
-    render();
-    // If the old source ended while the picker was open, stop now.
-    if (rec && rec.display && rec.display.getVideoTracks()[0].readyState === 'ended') stopRecording();
-  }
+  if (!rec || !rec.sources[0] || !(phase === 'recording' || phase === 'paused')) return;
+  replaceSource(rec.sources[0]);
 }
 
 // ---------- The done view: playback, trim, markers, saving ----------
@@ -1659,10 +2099,31 @@ function setPhase(next) { phase = next; render(); }
 function render() {
   const live = isLive();
   const paused = phase === 'paused';
-  const setup = phase === 'setup' || phase === 'starting';
+  const arrangedFlow = !!(rec && rec.arranged);
+  const setup = phase === 'setup' || (phase === 'starting' && !arrangedFlow);
+  const arranging = phase === 'arranging' || (phase === 'starting' && arrangedFlow);
   const audioOnly = rec ? rec.audioOnly : (result ? result.mediaKind === 'audio' : readSettings().recordMode === 'audio');
 
   els.setupView.hidden = !setup;
+  els.arrangeView.hidden = !arranging;
+  els.countInView.hidden = phase !== 'countin';
+  els.arrangeBtn.hidden = !canComposite || audioOnly;
+  els.arrangeHint.hidden = els.arrangeBtn.hidden;
+  els.arrangeBtn.disabled = phase !== 'setup';
+  els.startArrangedBtn.disabled = phase !== 'arranging' || switching;
+
+  // Sources and camera (Chrome and Edge), while arranging and recording
+  const showSources = !!(rec && rec.compositor) && (arranging || phase === 'countin' || phase === 'recording' || phase === 'paused');
+  els.sourcesPanel.hidden = !showSources;
+  if (showSources) {
+    els.addSourceBtn.hidden = rec.sources.length >= 2;
+    els.addSourceBtn.disabled = switching;
+    els.layoutSelect.disabled = rec.sources.length < 2;
+    els.swapBtn.disabled = rec.sources.length < 2;
+    els.cameraManageBtn.disabled = switching;
+    els.liveCorner.disabled = !rec.camStream;
+    els.sourceList.querySelectorAll('button').forEach((b) => { b.disabled = switching; });
+  }
   els.liveSlot.hidden = !live;
   els.doneView.hidden = phase !== 'done';
   els.settings.hidden = !canRecord || !setup;
@@ -1695,7 +2156,7 @@ function render() {
   els.cameraBtn.disabled = phase === 'stopping';
   els.markerBtn.disabled = phase === 'stopping';
 
-  els.switchBtn.hidden = !(rec && rec.display && (rec.audioOnly || canSwitch));
+  els.switchBtn.hidden = !(rec && rec.audioOnly && rec.sources.length);
   els.switchBtn.disabled = switching || phase === 'stopping';
   els.popoutBtn.hidden = !canPip || !!pipWindow;
   els.popoutBtn.disabled = phase === 'stopping';
@@ -1721,7 +2182,8 @@ function render() {
   els.addMarkerHereBtn.disabled = busy;
 
   // Stage
-  const showVideo = live ? !audioOnly : phase === 'done';
+  const capturing = live || arranging || phase === 'countin';
+  const showVideo = capturing ? !audioOnly && !!rec && rec.sources.length > 0 : phase === 'done';
   els.video.hidden = !showVideo;
   els.stage.classList.toggle('is-audio', audioOnly && (phase === 'done' || live));
   els.stageEmpty.hidden = showVideo && !(audioOnly && phase === 'done');
@@ -1734,7 +2196,7 @@ function render() {
   } else if (audioOnly && phase === 'done') {
     els.stageTitle.textContent = 'Audio recording';
     els.stageText.textContent = '';
-  } else if (phase === 'starting') {
+  } else if (phase === 'starting' && !arrangedFlow) {
     els.stageTitle.textContent = 'Waiting for your selection';
     els.stageText.textContent = 'Pick what to record in the browser’s dialog.';
   } else {
@@ -1756,6 +2218,7 @@ const SHORTCUTS = [
   ['KeyS', 'S', 'Stop'],
 ];
 function onKeydown(e) {
+  if (e.key === 'Escape' && phase === 'countin' && !els.confirmDialog.open) { e.preventDefault(); cancelCountIn(); return; }
   // Escape collapses the expandable panel you're in (Settings, Trim, Markers), or Settings if it's open.
   if (e.key === 'Escape' && !e.defaultPrevented && !els.confirmDialog.open) {
     const doc = e.target.ownerDocument || document;
@@ -1767,16 +2230,26 @@ function onKeydown(e) {
       return;
     }
   }
-  if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.repeat) return;
+  if (!e.altKey || e.ctrlKey || e.metaKey || e.repeat) return;
+  // While arranging: Alt+R starts right away, Alt+Shift+R counts in with beeps first.
+  if (e.shiftKey) {
+    if (e.code === 'KeyR' && phase === 'arranging') { e.preventDefault(); startArranged({ countIn: true }); }
+    return;
+  }
   const recording = phase === 'recording' || phase === 'paused';
   let handled = true;
   switch (e.code) {
-    case 'KeyR': if (phase === 'setup') startRecording(); else if (phase === 'done') newRecording(); else handled = false; break;
+    case 'KeyR':
+      if (phase === 'setup') startRecording();
+      else if (phase === 'arranging') startArranged({ countIn: false });
+      else if (phase === 'done') newRecording();
+      else handled = false;
+      break;
     case 'KeyP': if (recording) togglePause(); else handled = false; break;
     case 'KeyM': if (rec && rec.micStream) toggleMute(); else handled = false; break;
     case 'KeyK': if (recording) addMarker(); else if (phase === 'done') addMarkerHere(); else handled = false; break;
     case 'KeyC': if (rec && rec.camStream) toggleCamera(); else handled = false; break;
-    case 'KeyS': if (recording) stopRecording(); else handled = false; break;
+    case 'KeyS': if (recording) stopRecording(); else if (phase === 'countin') cancelCountIn(); else handled = false; break;
     default: handled = false;
   }
   if (handled) e.preventDefault();
@@ -1795,8 +2268,12 @@ function renderShortcuts() {
     li.append(` ${label}`);
     return li;
   };
-  els.shortcutList.replaceChildren(...SHORTCUTS.filter(([code]) => code !== 'KeyC' || canComposite).map(([, key, label]) =>
-    item([[isMac ? `${mod}${key}` : `${mod}+${key}`, `${isMac ? 'Option' : 'Alt'} ${key}`]], label)));
+  const items = SHORTCUTS.filter(([code]) => code !== 'KeyC' || canComposite).map(([, key, label]) =>
+    item([[isMac ? `${mod}${key}` : `${mod}+${key}`, `${isMac ? 'Option' : 'Alt'} ${key}`]], label));
+  if (canComposite) {
+    items.splice(1, 0, item([[isMac ? `${mod}⇧R` : `${mod}+Shift+R`, `${isMac ? 'Option' : 'Alt'} Shift R`]], 'While arranging: count in, then record'));
+  }
+  els.shortcutList.replaceChildren(...items);
   const shift = (k) => (isMac ? `⇧${k}` : `Shift+${k}`);
   els.playerShortcutList.replaceChildren(
     item([[shift('<'), 'Shift less than'], [shift('>'), 'Shift greater than']], 'Slower, faster'),
@@ -1873,6 +2350,15 @@ els.cameraBtn.addEventListener('click', toggleCamera);
 els.markerBtn.addEventListener('click', addMarker);
 els.stopBtn.addEventListener('click', stopRecording);
 els.switchBtn.addEventListener('click', switchSource);
+els.arrangeBtn.addEventListener('click', arrangeSources);
+els.startArrangedBtn.addEventListener('click', () => startArranged({ countIn: true }));
+els.cancelArrangeBtn.addEventListener('click', () => cancelArrange());
+els.cancelCountInBtn.addEventListener('click', cancelCountIn);
+els.addSourceBtn.addEventListener('click', addSource);
+els.swapBtn.addEventListener('click', swapSources);
+els.layoutSelect.addEventListener('change', () => setLayoutMode(els.layoutSelect.value));
+els.cameraManageBtn.addEventListener('click', () => (rec && rec.camStream ? removeCamera() : addCamera()));
+els.liveCorner.addEventListener('change', () => setCameraCorner(els.liveCorner.value));
 els.popoutBtn.addEventListener('click', openPip);
 els.pipReturnBtn.addEventListener('click', closePip);
 els.newBtn.addEventListener('click', newRecording);
@@ -1909,7 +2395,7 @@ document.addEventListener('keydown', onKeydown);
 
 // Leaving the page on purpose discards an unsaved recording, so warn first.
 window.addEventListener('beforeunload', (e) => {
-  if (isLive() || phase === 'starting' || (result && (!result.saved || result.dirty)) || pendingRecovery) {
+  if (isLive() || phase === 'starting' || phase === 'arranging' || phase === 'countin' || (result && (!result.saved || result.dirty)) || pendingRecovery) {
     e.preventDefault();
     e.returnValue = '';
   }

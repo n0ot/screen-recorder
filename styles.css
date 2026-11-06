@@ -317,6 +317,17 @@ kbd {
   pointer-events: none;
 }
 
+/* Arranging and sources */
+.arrange { display: grid; gap: 12px; }
+.count-in-text { font-size: 1.0625rem; font-weight: 600; }
+.source-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.source-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; }
+.source-list .source-name { font-weight: 600; color: var(--text); font-size: 0.9375rem; }
+.source-detail { color: var(--muted); font-size: 0.875rem; }
+.field-row { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; }
+.field-row .select-wrap { min-width: 200px; }
+.sources-body { display: grid; gap: 14px; padding-top: 8px; }
+
 /* Audio-only stage */
 .stage.is-audio video { background: transparent; }
 .stage.is-audio .stage-empty { padding-bottom: 72px; }
