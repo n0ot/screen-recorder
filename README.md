@@ -11,7 +11,7 @@ A screen recorder that runs entirely in your browser. Nothing is uploaded: recor
 - Separate volume sliders and level meters for your mic and the tab's audio, adjustable while recording.
 - Audio-only mode, for meetings and voice notes, with much smaller files.
 - Show up to two windows, tabs, or screens at once, side by side or one above the other, plus a webcam bubble (Chrome and Edge). The layout is chosen automatically to make both as big as possible, and described out loud: where each source is and roughly how big its text will look.
-- **Arrange before recording:** set up your sources and camera and check the layout first. When you start, three short beeps and a long one give you time to switch to what you're recording; recording begins right after the long beep.
+- **Set up before recording:** on the main screen, share your sources and camera and check the layout first. You stay on the page while you share, and nothing is recorded until you start. When you start, three short beeps and a long one give you time to switch to what you're recording; recording begins right after the long beep. (With nothing shared, Start recording asks what to record and begins straight away.)
 - Add, replace, or remove sources and the camera while recording, swap sides, change the layout, or move the camera to another corner. Hiding the camera keeps it on; removing it turns it off.
 - An optional automatic stop after 15 minutes to 2 hours.
 - Pause and resume, mute the mic, and add markers as you go.
@@ -38,8 +38,8 @@ Also: keyboard shortcuts, screen reader support, light and dark mode, works offl
 
 | Shortcut (Alt, or Option on a Mac) | Action |
 |---|---|
-| Alt+R | Start recording, or start a new one (while arranging: start right away) |
-| Alt+Shift+R | While arranging: count in with beeps, then record |
+| Alt+R | Start recording right away, or start a new one |
+| Alt+Shift+R | Count in with beeps, then record (Chrome and Edge) |
 | Alt+P | Pause or resume |
 | Alt+M | Mute or unmute the microphone |
 | Alt+K | Add a marker |
@@ -69,4 +69,4 @@ Then open http://localhost:8000.
 
 ## Browser support
 
-Recent desktop versions of Chrome, Edge, Firefox, and Safari. Multiple sources, arranging, the webcam bubble, switching sources, floating controls, and recording straight to a chosen file need Chrome or Edge. Firefox records WebM only.
+Recent desktop versions of Chrome, Edge, Firefox, and Safari. Multiple sources, setting them up before recording, the webcam bubble, switching sources, floating controls, and recording straight to a chosen file need Chrome or Edge. Firefox records WebM only.

@@ -5,10 +5,10 @@ const $ = (id) => document.getElementById(id);
 const els = {
   stage: $('stage'), stageEmpty: $('stageEmpty'), stageTitle: $('stageTitle'), stageText: $('stageText'), video: $('video'),
   installBtn: $('installBtn'),
-  setupView: $('setupView'), startBtn: $('startBtn'), arrangeBtn: $('arrangeBtn'), arrangeHint: $('arrangeHint'),
-  arrangeView: $('arrangeView'), startArrangedBtn: $('startArrangedBtn'), cancelArrangeBtn: $('cancelArrangeBtn'),
+  setupView: $('setupView'), startBtn: $('startBtn'), startHint: $('startHint'),
   countInView: $('countInView'), cancelCountInBtn: $('cancelCountInBtn'),
-  sourcesPanel: $('sourcesPanel'), sourcesSummary: $('sourcesSummary'), sourceList: $('sourceList'), addSourceBtn: $('addSourceBtn'),
+  sourcesPanel: $('sourcesPanel'), sourcesSummary: $('sourcesSummary'), sourceList: $('sourceList'), sourcesEmpty: $('sourcesEmpty'),
+  addSourceBtn: $('addSourceBtn'), addSourceLabel: $('addSourceLabel'),
   layoutSelect: $('layoutSelect'), swapBtn: $('swapBtn'), layoutDescription: $('layoutDescription'),
   cameraManageBtn: $('cameraManageBtn'), cameraManageLabel: $('cameraManageLabel'), liveCorner: $('liveCorner'), cameraRow: $('cameraRow'),
   liveSlot: $('liveSlot'), liveControls: $('liveControls'), recPill: $('recPill'), recLabel: $('recLabel'), timer: $('timer'), liveNotes: $('liveNotes'),
@@ -668,7 +668,7 @@ function createCompositor({ width, height, corner, onLayout }) {
   const writer = generator.writable.getWriter();
   const canvas = new OffscreenCanvas(Math.max(2, width & ~1), Math.max(2, height & ~1));
   const ctx = canvas.getContext('2d', { alpha: false });
-  const W = canvas.width, H = canvas.height;
+  let W = canvas.width, H = canvas.height;
   const slots = []; // { id, track, latest, token }
   let camera = null; // { track, visible, alive, token }
   let layoutMode = 'auto';
@@ -762,6 +762,15 @@ function createCompositor({ width, height, corner, onLayout }) {
       redraw();
     },
     swap() { slots.reverse(); redraw(); },
+    // Only before recording: H.264 can't change size part way through.
+    resize(width, height) {
+      const w = Math.max(2, width & ~1), h = Math.max(2, height & ~1);
+      if (w === W && h === H) return;
+      canvas.width = W = w;
+      canvas.height = H = h;
+      lastKey = '';
+      redraw();
+    },
     setLayout(mode) { layoutMode = mode; redraw(); },
     get layoutMode() { return layoutMode; },
     setCamera(track) {
@@ -873,8 +882,16 @@ function removeSourceNow(source) {
   render();
 }
 
+// Several sources at once needs Chrome or Edge, and doesn't apply to audio-only recordings.
+function multiSourceMode() {
+  if (rec) return !!rec.compositor;
+  return canComposite && readSettings().recordMode !== 'audio';
+}
+
 async function addSource() {
-  if (!rec || !rec.compositor || rec.sources.length >= 2 || switching) return;
+  if (!rec) { if (phase === 'setup' && multiSourceMode()) await shareFirstSource(); return; }
+  if (!rec.compositor || rec.sources.length >= 2 || switching) return;
+  let added = false;
   switching = true;
   render();
   announce('Choose a second window, tab, or screen. You’ll stay on this page.');
@@ -888,12 +905,17 @@ async function addSource() {
     await layoutIncludes(s.id);
     renderSources(true);
     announce(`Added ${sourceLabel(rec.sources.indexOf(s), s).replace(/^Source/, 'source')}. ${describeLayout()}`);
+    added = true;
   } catch (err) {
     announce(err.name === 'NotAllowedError' ? 'No source was added.' : `Couldn’t add a source: ${err.message || err.name}`,
       err.name === 'NotAllowedError' ? 'info' : 'error');
   } finally {
     switching = false;
     render();
+    // The add button hides once there are two sources, so move on to what comes next.
+    if (added && document.activeElement === els.addSourceBtn || (added && document.activeElement === document.body)) {
+      (phase === 'arranging' ? els.startBtn : els.layoutSelect).focus();
+    }
   }
 }
 
@@ -927,8 +949,15 @@ async function replaceSource(source) {
 }
 
 function removeSource(source) {
-  if (!rec || rec.sources.length < 2 || !rec.sources.includes(source)) return;
+  if (!rec || !rec.sources.includes(source)) return;
   const label = sourceLabel(rec.sources.indexOf(source), source);
+  if (rec.sources.length < 2) {
+    // Before recording, removing the only source goes back to an empty main screen.
+    if (phase !== 'arranging') return;
+    cancelArrange(`${label} removed. Nothing is shared now.`, { quiet: true });
+    els.addSourceBtn.focus();
+    return;
+  }
   removeSourceNow(source);
   announce(`${label} removed. ${describeLayout()}`);
   els.addSourceBtn.focus();
@@ -1022,7 +1051,18 @@ function setCameraCorner(c) {
 
 function renderSources(rebuild = false) {
   const has = !!(rec && rec.compositor);
-  if (!has) return;
+  els.sourcesEmpty.hidden = has;
+  els.addSourceLabel.textContent = has ? 'Add a second source' : 'Share a window, tab, or screen';
+  if (!has) {
+    els.sourceList.replaceChildren();
+    els.sourceList.hidden = true;
+    els.layoutDescription.textContent = '';
+    els.sourcesSummary.textContent = 'Nothing shared yet';
+    els.cameraManageLabel.textContent = 'Add camera';
+    els.liveCorner.value = readSettings().cameraCorner;
+    return;
+  }
+  els.sourceList.hidden = false;
   if (rebuild || els.sourceList.children.length !== rec.sources.length) {
     els.sourceList.replaceChildren(...rec.sources.map((src, i) => {
       const li = document.createElement('li');
@@ -1040,7 +1080,7 @@ function renderSources(rebuild = false) {
       replace.setAttribute('aria-label', `Replace ${sourceLabel(i, src)}`);
       replace.addEventListener('click', () => replaceSource(src));
       actions.append(replace);
-      if (rec.sources.length > 1) {
+      if (rec.sources.length > 1 || phase === 'arranging') {
         const remove = document.createElement('button');
         remove.type = 'button';
         remove.className = 'btn-link is-danger';
@@ -1154,9 +1194,10 @@ async function openFileOutputIfNeeded(settings, filename, warnings) {
   }
 }
 
-// Start recording right away (one source, or audio only).
-async function startRecording() {
-  if (phase !== 'setup' || !canRecord) return;
+// Start with nothing shared yet: pick one source (or none, for audio only) and record. With
+// countIn, you go to what you shared and hear the count-in there.
+async function startRecording({ countIn = false } = {}) {
+  if (phase !== 'setup' || !canRecord || switching || rec) return;
   const settings = readSettings();
   const audioOnly = settings.recordMode === 'audio';
   if (audioOnly && settings.micId === 'none' && !settings.systemAudio) {
@@ -1194,26 +1235,31 @@ async function startRecording() {
   rec.warnings = warnings;
   showPreview(rec);
   startMeter();
-  await prepareRecording(rec, { countIn: false });
+  await prepareRecording(rec, { countIn });
 }
 
-// Arrange first: add up to two sources and the camera, preview the result, then start.
-async function arrangeSources() {
-  if (phase !== 'setup' || !canComposite) return;
+// Sharing from the main screen: the first source starts a session that you can add a second
+// source and the camera to, with a live preview. Nothing is recorded until you start, and you
+// stay on this page (Chrome) instead of jumping to what you shared.
+async function shareFirstSource() {
+  if (phase !== 'setup' || rec || switching || !canComposite) return;
   const settings = readSettings();
   if (settings.recordMode === 'audio') return;
-  setPhase('starting');
-  announce('Choose the first window, tab, or screen. You’ll stay on this page so you can arrange things.');
+  switching = true;
+  render();
+  announce('Choose a window, tab, or screen. You’ll stay on this page, and nothing is recorded yet.');
   let first;
   try {
     first = await pickSource(settings, { keepFocus: true });
   } catch (err) {
-    setPhase('setup');
     announce(err.name === 'NotAllowedError' ? 'Nothing was shared.' : `Couldn’t start capturing: ${err.message || err.name}`,
       err.name === 'NotAllowedError' ? 'info' : 'error');
-    els.arrangeBtn.focus();
     return;
+  } finally {
+    switching = false;
+    render();
   }
+  if (phase !== 'setup' || rec) { stopStream(first.stream); return; }
   rec = createSession(settings, [first]);
   rec.arranged = true;
   if (settings.cameraId !== 'none') {
@@ -1222,15 +1268,14 @@ async function arrangeSources() {
   showPreview(rec);
   startMeter();
   setPhase('arranging');
-  els.sourcesPanel.open = true;
   await layoutIncludes(first.id);
   if (rec === null || phase !== 'arranging') return; // already started or cancelled
   renderSources(true);
-  announce(`Sharing ${surfaceName(first)}. Add a second source if you like, then start recording. After you press Start recording, switch to what you’re recording: you’ll hear three short beeps and a long one, and recording starts right after the long beep.`);
-  els.addSourceBtn.focus();
+  announce(`Sharing ${surfaceName(first)}. Add a second source or your camera if you like, then start recording.`);
 }
 
-function cancelArrange(reason = '') {
+// Stops sharing everything and goes back to an empty main screen.
+function cancelArrange(reason = '', { quiet = false } = {}) {
   if (!rec || !(phase === 'arranging' || phase === 'countin' || (phase === 'starting' && rec.arranged))) return;
   const session = rec;
   rec = null;
@@ -1239,20 +1284,52 @@ function cancelArrange(reason = '') {
   discardOutput(session.output);
   els.video.srcObject = null;
   setPhase('setup');
-  announce(`${reason ? reason + ' ' : ''}Nothing was recorded.`.trim());
-  els.startBtn.focus();
+  renderSources(true);
+  announce(quiet ? reason : `${reason ? reason + ' ' : ''}Nothing was recorded.`.trim());
+  if (!quiet) (multiSourceMode() ? els.addSourceBtn : els.startBtn).focus();
+}
+
+// Settings can still be changed after sharing, so pick them up again just before recording.
+function refreshSessionSettings(session) {
+  const settings = { ...readSettings(), recordMode: session.settings.recordMode };
+  session.settings = settings;
+  session.autoStopMs = settings.autoStop ? settings.autoStop * 60_000 : 0;
+  const preset = PRESETS[settings.quality];
+  if (session.compositor) {
+    session.compositor.resize(preset.width, preset.height);
+    const { video } = displayOptions(settings);
+    delete video.displaySurface;
+    for (const src of session.sources) src.track.applyConstraints(video).catch(() => {});
+  }
+  if (session.mixer) session.mixer.close();
+  session.mixer = null;
+  if (settings.systemAudio || settings.micId !== 'none') {
+    session.mixer = createMixer(settings);
+    for (const src of session.sources) session.mixer.setDisplay(src.id, src.stream);
+  }
+  cancelAnimationFrame(session.meterRaf);
+  startMeter();
 }
 
 async function startArranged({ countIn = true } = {}) {
-  if (phase !== 'arranging' || !rec) return;
+  if (phase !== 'arranging' || !rec || switching) return;
   if (!(await confirmReplacingRecovery()) || phase !== 'arranging') return;
   const session = rec;
+  refreshSessionSettings(session);
   session.filename = recordingFilename(session.settings);
   setPhase('starting');
   const file = await openFileOutputIfNeeded(session.settings, session.filename, session.warnings);
-  if (!file.ok) { setPhase('arranging'); announce('Recording not started, because no save location was chosen.'); els.startArrangedBtn.focus(); return; }
+  if (!file.ok) { setPhase('arranging'); announce('Recording not started, because no save location was chosen.'); els.startBtn.focus(); return; }
   session.output = file.output;
   await prepareRecording(session, { countIn });
+}
+
+// The Start button and Alt+R: with sources already shared, start (counting in first from the
+// button, so you have time to switch); with nothing shared, pick a source and record right away.
+function start({ countIn } = {}) {
+  if (phase === 'arranging') return startArranged({ countIn: countIn !== false });
+  if (phase === 'setup') return startRecording({ countIn: !!countIn && multiSourceMode() });
+  return undefined;
 }
 
 // Opens the microphone and storage, creates the recorder, then starts (or counts in).
@@ -1358,6 +1435,7 @@ async function prepareRecording(session, { countIn }) {
 // the moment the long beep ends, so the beeps aren't in the recording. Timing comes from the
 // audio clock, which keeps time even while you're on another tab.
 function runCountIn(session) {
+  session.arranged = true; // cancelling the count-in goes back to the main screen, still sharing
   setPhase('countin');
   announce('Switch to what you’re recording now. Recording starts right after the long beep.');
   const ctx = new AudioContext();
@@ -1403,7 +1481,7 @@ function cancelCountIn() {
   session.warnings = [];
   setPhase('arranging');
   announce('Count-in cancelled. Nothing was recorded.');
-  els.startArrangedBtn.focus();
+  els.startBtn.focus();
 }
 
 function beginRecording() {
@@ -1413,6 +1491,7 @@ function beginRecording() {
   rec.timerId = setInterval(tick, 500);
   setPhase('recording');
   tick();
+  els.sourcesPanel.open = false; // keep the recording controls up front; it's one click away
   renderSources(true);
   const w = rec.warnings;
   announce(['Recording started.', ...w].join(' '), w.length ? 'warn' : 'info');
@@ -2001,6 +2080,8 @@ async function newRecording() {
     if (old.storedName && old.savedVia !== 'download') removal = storage.remove(old.storedName);
   }
   setPhase('setup');
+  els.sourcesPanel.open = true;
+  renderSources(true);
   Promise.resolve(removal).then(() => refreshRecovery());
   announce('Ready for a new recording.');
   els.startBtn.focus();
@@ -2104,33 +2185,42 @@ function render() {
   const arranging = phase === 'arranging' || (phase === 'starting' && arrangedFlow);
   const audioOnly = rec ? rec.audioOnly : (result ? result.mediaKind === 'audio' : readSettings().recordMode === 'audio');
 
-  els.setupView.hidden = !setup;
-  els.arrangeView.hidden = !arranging;
+  // The main screen: share sources (Chrome and Edge), then start.
+  const main = setup || arranging;
+  const multi = canRecord && multiSourceMode();
+  const shared = !!(rec && rec.sources.length) && arranging;
+  els.setupView.hidden = !main;
   els.countInView.hidden = phase !== 'countin';
-  els.arrangeBtn.hidden = !canComposite || audioOnly;
-  els.arrangeHint.hidden = els.arrangeBtn.hidden;
-  els.arrangeBtn.disabled = phase !== 'setup';
-  els.startArrangedBtn.disabled = phase !== 'arranging' || switching;
+  els.startBtn.disabled = !(phase === 'setup' || phase === 'arranging') || !canRecord || switching;
+  els.startBtn.setAttribute('aria-keyshortcuts', multi ? 'Alt+Shift+R Alt+R' : 'Alt+R');
+  els.startHint.textContent = !canRecord ? ''
+    : shared ? `When you press Start recording, switch to what you’re recording. You’ll hear three short beeps and a long one, and recording starts right after the long beep. ${isMac ? 'Option' : 'Alt'}+R starts without the beeps.`
+    : audioOnly ? 'Records your microphone and, if you choose, a tab’s audio.'
+    : multi ? 'With nothing shared yet, Start recording asks what to record and begins straight away.'
+    : 'Pick a screen, window, or tab, and recording begins straight away.';
+  els.startHint.hidden = !els.startHint.textContent;
 
-  // Sources and camera (Chrome and Edge), while arranging and recording
-  const showSources = !!(rec && rec.compositor) && (arranging || phase === 'countin' || phase === 'recording' || phase === 'paused');
+  // Sources and camera (Chrome and Edge): on the main screen and while recording
+  const showSources = multi && (main || phase === 'countin' || phase === 'recording' || phase === 'paused');
   els.sourcesPanel.hidden = !showSources;
   if (showSources) {
-    els.addSourceBtn.hidden = rec.sources.length >= 2;
-    els.addSourceBtn.disabled = switching;
-    els.layoutSelect.disabled = rec.sources.length < 2;
-    els.swapBtn.disabled = rec.sources.length < 2;
-    els.cameraManageBtn.disabled = switching;
-    els.liveCorner.disabled = !rec.camStream;
+    const n = rec ? rec.sources.length : 0;
+    els.addSourceBtn.hidden = n >= 2;
+    els.addSourceBtn.disabled = !(phase === 'setup' || rec);
+    els.layoutSelect.disabled = n < 2;
+    els.swapBtn.disabled = n < 2;
+    els.cameraManageBtn.disabled = switching || !rec;
+    els.liveCorner.disabled = !(rec && rec.camStream);
     els.sourceList.querySelectorAll('button').forEach((b) => { b.disabled = switching; });
   }
   els.liveSlot.hidden = !live;
   els.doneView.hidden = phase !== 'done';
-  els.settings.hidden = !canRecord || !setup;
-  els.settingsBody.disabled = phase !== 'setup';
-  els.toolsRow.hidden = !setup;
-  els.repairBtn.disabled = phase !== 'setup';
-  els.startBtn.disabled = phase !== 'setup' || !canRecord;
+  els.settings.hidden = !canRecord || !main;
+  // Settings stay editable after sharing; what to record is fixed once something is shared.
+  els.settingsBody.disabled = !(phase === 'setup' || phase === 'arranging');
+  els.recordModeInputs.forEach((i) => { i.disabled = !!rec; });
+  els.toolsRow.hidden = !(phase === 'setup' && !rec);
+  els.repairBtn.disabled = phase !== 'setup' || switching;
 
   // Live controls
   els.recPill.dataset.state = phase;
@@ -2196,13 +2286,14 @@ function render() {
   } else if (audioOnly && phase === 'done') {
     els.stageTitle.textContent = 'Audio recording';
     els.stageText.textContent = '';
-  } else if (phase === 'starting' && !arrangedFlow) {
+  } else if ((phase === 'starting' && !arrangedFlow) || (switching && !rec)) {
     els.stageTitle.textContent = 'Waiting for your selection';
-    els.stageText.textContent = 'Pick what to record in the browser’s dialog.';
+    els.stageText.textContent = 'Pick what to share in the browser’s dialog.';
   } else {
     els.stageTitle.textContent = 'Ready when you are';
     els.stageText.textContent = readSettings().recordMode === 'audio'
       ? 'Start recording to capture your microphone and, if you choose, a tab’s audio.'
+      : multi ? 'Share a window, tab, or screen to see a preview here, or start recording to pick one and record straight away.'
       : 'Start recording, then pick a screen, window, or tab to capture.';
   }
   if (!live) document.title = 'Screen Recorder';
@@ -2231,17 +2322,16 @@ function onKeydown(e) {
     }
   }
   if (!e.altKey || e.ctrlKey || e.metaKey || e.repeat) return;
-  // While arranging: Alt+R starts right away, Alt+Shift+R counts in with beeps first.
+  // Alt+R starts right away; Alt+Shift+R counts in with beeps first (Chrome and Edge).
   if (e.shiftKey) {
-    if (e.code === 'KeyR' && phase === 'arranging') { e.preventDefault(); startArranged({ countIn: true }); }
+    if (e.code === 'KeyR' && (phase === 'setup' || phase === 'arranging') && multiSourceMode()) { e.preventDefault(); start({ countIn: true }); }
     return;
   }
   const recording = phase === 'recording' || phase === 'paused';
   let handled = true;
   switch (e.code) {
     case 'KeyR':
-      if (phase === 'setup') startRecording();
-      else if (phase === 'arranging') startArranged({ countIn: false });
+      if (phase === 'setup' || phase === 'arranging') start({ countIn: false });
       else if (phase === 'done') newRecording();
       else handled = false;
       break;
@@ -2271,7 +2361,7 @@ function renderShortcuts() {
   const items = SHORTCUTS.filter(([code]) => code !== 'KeyC' || canComposite).map(([, key, label]) =>
     item([[isMac ? `${mod}${key}` : `${mod}+${key}`, `${isMac ? 'Option' : 'Alt'} ${key}`]], label));
   if (canComposite) {
-    items.splice(1, 0, item([[isMac ? `${mod}⇧R` : `${mod}+Shift+R`, `${isMac ? 'Option' : 'Alt'} Shift R`]], 'While arranging: count in, then record'));
+    items.splice(1, 0, item([[isMac ? `${mod}⇧R` : `${mod}+Shift+R`, `${isMac ? 'Option' : 'Alt'} Shift R`]], 'Count in with beeps, then record'));
   }
   els.shortcutList.replaceChildren(...items);
   const shift = (k) => (isMac ? `⇧${k}` : `Shift+${k}`);
@@ -2343,16 +2433,15 @@ els.video.addEventListener('loadedmetadata', () => {
 });
 
 // ---------- Wiring ----------
-els.startBtn.addEventListener('click', startRecording);
+// From the button, a count-in only once things are shared (you're on this page and need time
+// to switch); with nothing shared, it asks what to record and starts straight away.
+els.startBtn.addEventListener('click', () => start({ countIn: phase === 'arranging' }));
 els.pauseBtn.addEventListener('click', togglePause);
 els.muteBtn.addEventListener('click', toggleMute);
 els.cameraBtn.addEventListener('click', toggleCamera);
 els.markerBtn.addEventListener('click', addMarker);
 els.stopBtn.addEventListener('click', stopRecording);
 els.switchBtn.addEventListener('click', switchSource);
-els.arrangeBtn.addEventListener('click', arrangeSources);
-els.startArrangedBtn.addEventListener('click', () => startArranged({ countIn: true }));
-els.cancelArrangeBtn.addEventListener('click', () => cancelArrange());
 els.cancelCountInBtn.addEventListener('click', cancelCountIn);
 els.addSourceBtn.addEventListener('click', addSource);
 els.swapBtn.addEventListener('click', swapSources);
@@ -2437,6 +2526,8 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
 loadSettings();
 renderShortcuts();
 updateSettingsUI();
+els.sourcesPanel.open = true;
+renderSources();
 render();
 refreshDevices();
 storage.init().then(() => {
