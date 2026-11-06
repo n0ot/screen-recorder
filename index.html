@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <meta name="description" content="A screen recorder that runs in your browser. Recordings never leave your device.">
-<meta name="theme-color" content="#f4f4f5" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0f0f11" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c0c0e" media="(prefers-color-scheme: dark)">
 <title>Screen Recorder</title>
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -16,190 +16,230 @@
 <script src="js/app.js" defer></script>
 </head>
 <body>
+<!-- Icons, drawn once and used by reference -->
+<svg width="0" height="0" class="icon-sprite" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></symbol>
+    <symbol id="i-mic-off" viewBox="0 0 24 24"><path d="M2 2l20 20M9 9v2a3 3 0 0 0 5.1 2.1M15 9.3V5a3 3 0 0 0-5.7-1.3M5 11a7 7 0 0 0 11.6 5.3M19 11a7 7 0 0 1-.6 2.8M12 18v4"/></symbol>
+    <symbol id="i-cam" viewBox="0 0 24 24"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></symbol>
+    <symbol id="i-sound" viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></symbol>
+    <symbol id="i-sound-off" viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M22 9l-6 6M16 9l6 6"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2.5" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-marker" viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></symbol>
+    <symbol id="i-switch" viewBox="0 0 24 24"><path d="M17 3l4 4-4 4M21 7H8M7 21l-4-4 4-4M3 17h13"/></symbol>
+    <symbol id="i-pip" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><rect x="12" y="11" width="7" height="6" rx="1" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+    <symbol id="i-replace" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16M3 12a9 9 0 0 1 15.5-6.2L21 8"/><path d="M21 3v5h-5M3 21v-5h5"/></symbol>
+    <symbol id="i-expand" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></symbol>
+    <symbol id="i-auto" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></symbol>
+    <symbol id="i-side" viewBox="0 0 24 24"><rect x="2" y="5" width="9" height="14" rx="1.5"/><rect x="13" y="5" width="9" height="14" rx="1.5"/></symbol>
+    <symbol id="i-stacked" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="9" rx="1.5"/><rect x="4" y="13" width="16" height="9" rx="1.5"/></symbol>
+    <symbol id="i-swap" viewBox="0 0 24 24"><path d="M16 3l4 4-4 4M20 7H4M8 21l-4-4 4-4M4 17h16"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+    <symbol id="i-scissors" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.1 15.9M14.5 14.5L20 20M8.1 8.1L12 12"/></symbol>
+    <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z"/></symbol>
+    <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+    <symbol id="i-text" viewBox="0 0 24 24"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></symbol>
+  </defs>
+</svg>
+
 <div class="app">
   <header class="app-header">
     <div class="brand">
-      <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="currentColor"/><circle cx="16" cy="16" r="7" fill="#e5484d"/></svg>
+      <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="currentColor"/><circle cx="16" cy="16" r="7" fill="#ff453a"/></svg>
       <h1>Screen Recorder</h1>
     </div>
     <div class="header-actions">
-      <p class="tagline">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
-        Recordings never leave your device.
-      </p>
-      <button id="installBtn" class="btn btn-secondary btn-sm" type="button" hidden>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
-        <span>Install app</span>
+      <p class="tagline"><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg>Stays on your device</p>
+      <button id="installBtn" class="btn btn-ghost btn-sm" type="button" hidden>
+        <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg><span>Install app</span>
       </button>
     </div>
   </header>
 
   <main class="card">
+    <!-- Recovered recording -->
+    <section id="recovery" class="recovery" aria-labelledby="recoveryHeading" hidden>
+      <h2 id="recoveryHeading">Unsaved recording recovered</h2>
+      <p class="visually-hidden">It was kept because the page closed unexpectedly. Leaving this page or starting a new recording deletes it.</p>
+      <ul id="recoveryList"></ul>
+    </section>
+
+    <!-- The stage: preview while setting up and recording, the player afterwards -->
     <div class="stage" id="stage">
       <div class="stage-empty" id="stageEmpty">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-        <strong id="stageTitle">Ready when you are</strong>
-        <span id="stageText">Start recording, then pick a screen, window, or tab to capture.</span>
+        <svg class="stage-art" aria-hidden="true"><use href="#i-monitor"/></svg>
+        <strong id="stageTitle"></strong>
+        <span id="stageText"></span>
       </div>
-      <video id="video" playsinline muted hidden aria-label="Screen preview"></video>
+      <video id="video" playsinline muted hidden aria-label="Preview"></video>
+      <ul id="sourceList" class="source-overlays" aria-label="Shared sources" hidden></ul>
+      <button id="addSourceBtn" class="add-source" type="button">
+        <span class="add-source-icon"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg></span>
+        <span id="addSourceLabel">Add a screen, window, or tab</span>
+      </button>
+      <button id="previewBtn" class="stage-icon-btn" type="button" aria-label="View preview full screen" title="Full screen" hidden>
+        <svg class="icon" aria-hidden="true"><use href="#i-expand"/></svg>
+      </button>
       <div id="stageToast" class="stage-toast" aria-hidden="true" hidden></div>
     </div>
 
+    <!-- Composition: camera and layout (Chrome and Edge) -->
+    <div id="sourcesPanel" class="stage-bar" hidden>
+      <div class="bar-group">
+        <button id="cameraManageBtn" class="chip" type="button" aria-pressed="false">
+          <svg class="icon" aria-hidden="true"><use href="#i-cam"/></svg><span id="cameraManageLabel">Camera</span>
+        </button>
+        <fieldset id="liveCorner" class="corner-picker" disabled>
+          <legend class="visually-hidden">Camera corner</legend>
+          <label title="Top left"><input type="radio" name="corner" value="tl"><span class="visually-hidden">Top left</span></label>
+          <label title="Top right"><input type="radio" name="corner" value="tr"><span class="visually-hidden">Top right</span></label>
+          <label title="Bottom left"><input type="radio" name="corner" value="bl"><span class="visually-hidden">Bottom left</span></label>
+          <label title="Bottom right"><input type="radio" name="corner" value="br" checked><span class="visually-hidden">Bottom right</span></label>
+        </fieldset>
+        <span class="bar-divider" aria-hidden="true"></span>
+        <ul id="soundList" class="sound-list" aria-label="Sound only" hidden></ul>
+        <button id="addSoundBtn" class="chip" type="button" aria-describedby="addSoundHint">
+          <svg class="icon" aria-hidden="true"><use href="#i-music"/></svg><span>Add sound</span>
+        </button>
+        <span id="addSoundHint" class="visually-hidden">Records a tab’s sound, such as music, without showing it.</span>
+      </div>
+      <div id="balanceRow" class="bar-group layout-group" hidden>
+        <fieldset id="layoutSelect" class="segmented">
+          <legend class="visually-hidden">Layout</legend>
+          <label title="Automatic"><input type="radio" name="layout" value="auto" checked><svg class="icon" aria-hidden="true"><use href="#i-auto"/></svg><span>Auto</span></label>
+          <label title="Side by side"><input type="radio" name="layout" value="side"><svg class="icon" aria-hidden="true"><use href="#i-side"/></svg><span class="visually-hidden">Side by side</span></label>
+          <label title="One above the other"><input type="radio" name="layout" value="stacked"><svg class="icon" aria-hidden="true"><use href="#i-stacked"/></svg><span class="visually-hidden">One above the other</span></label>
+        </fieldset>
+        <button id="swapBtn" class="chip chip-icon" type="button" aria-label="Swap sources" title="Swap">
+          <svg class="icon" aria-hidden="true"><use href="#i-swap"/></svg>
+        </button>
+        <label class="balance" title="Size balance">
+          <span class="visually-hidden">Size balance</span>
+          <span class="balance-end" aria-hidden="true"></span>
+          <input type="range" id="balanceRange" min="0" max="8" step="1" value="4">
+          <span class="balance-end is-big" aria-hidden="true"></span>
+        </label>
+        <output id="balanceOut" for="balanceRange" class="visually-hidden"></output>
+      </div>
+      <p id="layoutDescription" class="visually-hidden"></p>
+    </div>
+
     <div class="panel">
-      <!-- Live -->
+      <!-- Ready to record -->
+      <section id="setupView" class="dock" aria-label="Record">
+        <fieldset class="segmented mode-switch" id="modeSwitch">
+          <legend class="visually-hidden">What to record</legend>
+          <label><input type="radio" name="recordMode" id="recordModeScreen" value="screen" checked><svg class="icon" aria-hidden="true"><use href="#i-monitor"/></svg><span>Screen</span></label>
+          <label><input type="radio" name="recordMode" id="recordModeAudio" value="audio"><svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg><span>Audio</span></label>
+        </fieldset>
+        <button id="startBtn" class="record-btn" type="button" aria-keyshortcuts="Alt+R" aria-describedby="startHint">
+          <span class="record-dot" aria-hidden="true"></span><span>Record</span>
+        </button>
+        <div class="dock-group">
+          <label class="tool">
+            <input type="checkbox" id="micOn" class="tool-input" checked>
+            <span class="tool-icon"><svg class="icon on" aria-hidden="true"><use href="#i-mic"/></svg><svg class="icon off" aria-hidden="true"><use href="#i-mic-off"/></svg></span>
+            <span class="tool-label">Mic</span>
+          </label>
+          <label class="tool">
+            <input type="checkbox" id="systemAudio" class="tool-input" checked>
+            <span class="tool-icon"><svg class="icon on" aria-hidden="true"><use href="#i-sound"/></svg><svg class="icon off" aria-hidden="true"><use href="#i-sound-off"/></svg></span>
+            <span class="tool-label">Tab audio</span>
+          </label>
+        </div>
+        <p id="startHint" class="visually-hidden"></p>
+      </section>
+
+      <!-- Recording -->
       <section id="liveSlot" aria-label="Recording controls" hidden>
         <div id="liveControls" class="live">
-          <div class="live-status">
+          <div class="dock">
             <div id="recPill" class="rec-pill" data-state="recording">
               <span class="rec-dot" aria-hidden="true"></span>
-              <span id="recLabel">Recording</span>
+              <span id="recLabel" class="visually-hidden">Recording</span>
               <span id="timer" class="timer" role="timer" aria-label="Elapsed time">0:00</span>
             </div>
-            <p id="liveNotes" class="live-file hide-in-pip" hidden></p>
-          </div>
-          <div class="toolbar">
-            <button id="pauseBtn" class="btn btn-secondary" type="button" aria-keyshortcuts="Alt+P">
-              <svg id="pauseIcon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
-              <svg id="resumeIcon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" hidden><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z"/></svg>
-              <span id="pauseLabel">Pause</span>
-            </button>
-            <button id="muteBtn" class="btn btn-secondary" type="button" aria-keyshortcuts="Alt+M">
-              <svg id="micOnIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg>
-              <svg id="micOffIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" hidden><path d="M2 2l20 20M9 9v2a3 3 0 0 0 5.1 2.1M15 9.3V5a3 3 0 0 0-5.7-1.3M5 11a7 7 0 0 0 11.6 5.3M19 11a7 7 0 0 1-.6 2.8M12 18v4"/></svg>
-              <span id="muteLabel">Mute mic</span>
-            </button>
-            <button id="cameraBtn" class="btn btn-secondary" type="button" aria-keyshortcuts="Alt+C" hidden>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-              <span id="cameraLabel">Hide camera</span>
-            </button>
-            <button id="markerBtn" class="btn btn-secondary" type="button" aria-keyshortcuts="Alt+K">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-              <span>Add marker</span>
-            </button>
-            <button id="switchBtn" class="btn btn-secondary hide-in-pip" type="button">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3l4 4-4 4M21 7H8M7 21l-4-4 4-4M3 17h13"/></svg>
-              <span>Switch source</span>
-            </button>
-            <button id="popoutBtn" class="btn btn-secondary hide-in-pip" type="button">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12" y="11" width="7" height="6" rx="1" fill="currentColor" stroke="none"/></svg>
-              <span>Floating controls</span>
-            </button>
-            <span class="spacer hide-in-pip"></span>
-            <button id="stopBtn" class="btn btn-danger" type="button" aria-keyshortcuts="Alt+S">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
-              <span>Stop</span>
+            <div class="dock-group">
+              <button id="pauseBtn" class="tool" type="button" aria-keyshortcuts="Alt+P">
+                <span class="tool-icon"><svg id="pauseIcon" class="icon" aria-hidden="true"><use href="#i-pause"/></svg><svg id="resumeIcon" class="icon" aria-hidden="true" hidden><use href="#i-play"/></svg></span>
+                <span id="pauseLabel" class="tool-label">Pause</span>
+              </button>
+              <button id="muteBtn" class="tool" type="button" aria-keyshortcuts="Alt+M">
+                <span class="tool-icon"><svg id="micOnIcon" class="icon" aria-hidden="true"><use href="#i-mic"/></svg><svg id="micOffIcon" class="icon" aria-hidden="true" hidden><use href="#i-mic-off"/></svg></span>
+                <span id="muteLabel" class="tool-label">Mute</span>
+              </button>
+              <button id="cameraBtn" class="tool" type="button" aria-keyshortcuts="Alt+C" hidden>
+                <span class="tool-icon"><svg class="icon" aria-hidden="true"><use href="#i-cam"/></svg></span>
+                <span id="cameraLabel" class="tool-label">Hide camera</span>
+              </button>
+              <button id="markerBtn" class="tool" type="button" aria-keyshortcuts="Alt+K">
+                <span class="tool-icon"><svg class="icon" aria-hidden="true"><use href="#i-marker"/></svg></span>
+                <span class="tool-label">Marker</span>
+              </button>
+              <button id="switchBtn" class="tool hide-in-pip" type="button">
+                <span class="tool-icon"><svg class="icon" aria-hidden="true"><use href="#i-switch"/></svg></span>
+                <span class="tool-label">Switch</span>
+              </button>
+              <button id="popoutBtn" class="tool hide-in-pip" type="button" aria-label="Floating controls">
+                <span class="tool-icon"><svg class="icon" aria-hidden="true"><use href="#i-pip"/></svg></span>
+                <span class="tool-label" aria-hidden="true">Float</span>
+              </button>
+            </div>
+            <button id="stopBtn" class="stop-btn" type="button" aria-keyshortcuts="Alt+S">
+              <svg class="icon" aria-hidden="true"><use href="#i-stop"/></svg><span>Stop</span>
             </button>
           </div>
           <div id="levels" class="levels" hidden>
             <div id="micLevel" class="level">
-              <label class="level-label" for="micVolume">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg>
-                Mic <output id="micVolumeOut">100%</output>
-              </label>
+              <label class="level-label" for="micVolume"><svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg><span class="visually-hidden">Mic</span></label>
               <span class="meter-track" aria-hidden="true"><span id="micMeterFill" class="meter-fill"></span></span>
               <input type="range" id="micVolume" class="hide-in-pip" min="0" max="200" step="5" value="100">
+              <output id="micVolumeOut" for="micVolume">100%</output>
             </div>
             <div id="tabLevel" class="level">
-              <label class="level-label" for="tabVolume">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>
-                Tab audio <output id="tabVolumeOut">100%</output>
-              </label>
+              <label class="level-label" for="tabVolume"><svg class="icon" aria-hidden="true"><use href="#i-sound"/></svg><span class="visually-hidden">Tab audio</span></label>
               <span class="meter-track" aria-hidden="true"><span id="tabMeterFill" class="meter-fill"></span></span>
               <input type="range" id="tabVolume" class="hide-in-pip" min="0" max="200" step="5" value="100">
+              <output id="tabVolumeOut" for="tabVolume">100%</output>
             </div>
           </div>
+          <p id="liveNotes" class="live-notes hide-in-pip" hidden></p>
         </div>
         <div id="pipNote" class="pip-note" hidden>
+          <svg class="icon" aria-hidden="true"><use href="#i-pip"/></svg>
           <span>Controls are in a floating window.</span>
-          <button id="pipReturnBtn" class="btn-link" type="button">Bring them back here</button>
-        </div>
-      </section>
-
-      <!-- Sources and camera: on the main screen and while recording (Chrome and Edge) -->
-      <details id="sourcesPanel" class="settings" hidden>
-        <summary>Sources and camera <span id="sourcesSummary" class="settings-summary"></span></summary>
-        <div class="settings-body sources-body">
-          <ul id="sourceList" class="source-list" aria-label="Sources"></ul>
-          <p id="sourcesEmpty" class="empty-note">Nothing shared yet. Share up to two windows, tabs, or screens to show them side by side, and add your camera if you like. You’ll stay on this page, so nothing is recorded until you start.</p>
-          <div class="toolbar">
-            <button id="addSourceBtn" class="btn btn-secondary btn-sm" type="button">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-              <span id="addSourceLabel">Share a window, tab, or screen</span>
-            </button>
-          </div>
-          <div class="field-row">
-            <label class="field-label" for="layoutSelect">Layout</label>
-            <div class="select-wrap">
-              <select id="layoutSelect">
-                <option value="auto">Automatic</option>
-                <option value="side">Side by side</option>
-                <option value="stacked">One above the other</option>
-              </select>
-            </div>
-            <button id="swapBtn" class="btn btn-secondary btn-sm" type="button">Swap</button>
-          </div>
-          <p id="layoutDescription" class="hint"></p>
-          <div class="field-row" id="cameraRow">
-            <button id="cameraManageBtn" class="btn btn-secondary btn-sm" type="button">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
-              <span id="cameraManageLabel">Add camera</span>
-            </button>
-            <label class="field-label" for="liveCorner">Camera corner</label>
-            <div class="select-wrap">
-              <select id="liveCorner">
-                <option value="br">Bottom right</option>
-                <option value="bl">Bottom left</option>
-                <option value="tr">Top right</option>
-                <option value="tl">Top left</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </details>
-
-      <!-- Start: on the main screen, after any sources are shared -->
-      <section id="setupView" aria-label="Start recording">
-        <div class="toolbar">
-          <button id="startBtn" class="btn btn-primary btn-lg" type="button" aria-keyshortcuts="Alt+R" aria-describedby="startHint">
-            <span class="rec-icon" aria-hidden="true"></span>
-            <span>Start recording</span>
-          </button>
-        </div>
-        <p id="startHint" class="hint"></p>
-        <section id="recovery" class="recovery" aria-labelledby="recoveryHeading" hidden>
-          <h2 id="recoveryHeading">Unsaved recording found</h2>
-          <p class="hint">It was kept because the page closed unexpectedly. Save it to keep it. Leaving this page or starting a new recording deletes it.</p>
-          <ul id="recoveryList"></ul>
-        </section>
-      </section>
-
-      <!-- Count-in -->
-      <section id="countInView" class="arrange" aria-label="Count-in" hidden>
-        <p class="count-in-text">Switch to what you’re recording. Recording starts right after the long beep.</p>
-        <div class="toolbar">
-          <button id="cancelCountInBtn" class="btn btn-secondary" type="button">Cancel</button>
+          <button id="pipReturnBtn" class="btn-link" type="button">Bring them back</button>
         </div>
       </section>
 
       <!-- Done -->
       <section id="doneView" class="done" aria-labelledby="doneHeading" hidden>
-        <h2 id="doneHeading" tabindex="-1">Your recording is ready</h2>
-        <p class="file-meta" id="fileMeta"></p>
-        <div class="toolbar">
-          <button id="saveBtn" class="btn btn-accent" type="button">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
-            <span id="saveLabel">Save recording</span>
-          </button>
-          <button id="newBtn" class="btn btn-secondary" type="button" aria-keyshortcuts="Alt+R">
-            <span class="rec-icon" aria-hidden="true"></span>
-            <span>New recording</span>
-          </button>
+        <div class="done-head">
+          <div class="done-title">
+            <h2 id="doneHeading" tabindex="-1">Recording ready</h2>
+            <p class="file-meta" id="fileMeta"></p>
+          </div>
+          <div class="done-actions">
+            <button id="newBtn" class="btn btn-ghost" type="button" aria-keyshortcuts="Alt+R">
+              <span class="record-dot is-small" aria-hidden="true"></span><span>New recording</span>
+            </button>
+            <button id="saveBtn" class="btn btn-accent" type="button">
+              <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg><span id="saveLabel">Save recording</span>
+            </button>
+          </div>
         </div>
 
         <div class="edit">
-          <details id="trimPanel" class="settings">
-            <summary>Trim <span id="trimSummary" class="settings-summary"></span></summary>
-            <div class="settings-body">
+          <details id="trimPanel" class="drawer">
+            <summary><svg class="icon" aria-hidden="true"><use href="#i-scissors"/></svg>Trim <span id="trimSummary" class="drawer-summary"></span></summary>
+            <div class="drawer-body">
               <div class="trim-grid">
                 <div class="field">
                   <label class="field-label" for="trimStart">Start</label>
@@ -214,39 +254,35 @@
               </div>
               <p id="trimHint" class="hint" aria-live="polite"></p>
               <div class="toolbar">
-                <button id="applyTrimBtn" class="btn btn-secondary btn-sm" type="button">Apply trim</button>
+                <button id="applyTrimBtn" class="btn btn-ghost btn-sm" type="button">Apply trim</button>
                 <button id="undoTrimBtn" class="btn-link" type="button" hidden>Undo trim</button>
               </div>
             </div>
           </details>
 
-          <details id="markersPanel" class="settings">
-            <summary>Markers <span id="markersSummary" class="settings-summary"></span></summary>
-            <div class="settings-body">
+          <details id="markersPanel" class="drawer">
+            <summary><svg class="icon" aria-hidden="true"><use href="#i-marker"/></svg>Markers <span id="markersSummary" class="drawer-summary"></span></summary>
+            <div class="drawer-body">
               <ol id="markerList" class="marker-list"></ol>
-              <p id="markersEmpty" class="empty-note">No markers yet. Add them while recording, or here at the current playback position.</p>
+              <p id="markersEmpty" class="empty-note">No markers yet.</p>
               <div class="toolbar">
-                <button id="addMarkerHereBtn" class="btn btn-secondary btn-sm" type="button" aria-keyshortcuts="Alt+K">Add marker at current position</button>
+                <button id="addMarkerHereBtn" class="btn btn-ghost btn-sm" type="button" aria-keyshortcuts="Alt+K">
+                  <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>Add at current position
+                </button>
                 <button id="copyChaptersBtn" class="btn-link" type="button">Copy chapter list</button>
               </div>
-              <p class="hint">In the player, Shift+← and Shift+→ jump to the previous and next marker.</p>
-              <p class="hint">Markers are saved as chapters in the file. VLC and most players show them; QuickTime doesn’t show chapters in MP4 files.</p>
+              <p class="hint">Saved as chapters, which VLC and most players show.</p>
             </div>
           </details>
         </div>
       </section>
 
-      <!-- Settings (setup only) -->
-      <details id="settings" class="settings">
-        <summary>Settings <span id="settingsSummary" class="settings-summary"></span></summary>
-        <fieldset id="settingsBody" class="settings-body">
+      <!-- Settings -->
+      <details id="settings" class="drawer">
+        <summary><svg class="icon" aria-hidden="true"><use href="#i-gear"/></svg>Settings <span id="settingsSummary" class="drawer-summary"></span></summary>
+        <fieldset id="settingsBody" class="drawer-body">
           <legend class="visually-hidden">Recording settings</legend>
           <div class="settings-grid">
-            <fieldset class="group">
-              <legend>What to record</legend>
-              <label class="check"><input type="radio" name="recordMode" id="recordModeScreen" value="screen" checked> <span>Screen and audio</span></label>
-              <label class="check"><input type="radio" name="recordMode" id="recordModeAudio" value="audio"> <span>Audio only <small>Your microphone and, if you like, a tab’s audio. Much smaller files</small></span></label>
-            </fieldset>
             <div class="field" id="qualityField">
               <label class="field-label" for="qualitySelect">Quality</label>
               <div class="select-wrap">
@@ -269,40 +305,22 @@
               </div>
               <p class="hint" id="formatHint"></p>
             </div>
-
             <div class="field">
               <label class="field-label" for="micSelect">Microphone</label>
               <div class="select-wrap"><select id="micSelect"><option value="default">Default microphone</option><option value="none">No microphone</option></select></div>
-              <p class="hint" id="micHint">
-                <button id="micAccessBtn" class="btn-link" type="button">Allow microphone access</button> to choose a specific one.
-              </p>
+              <p class="hint" id="micHint"><button id="micAccessBtn" class="btn-link" type="button">Allow access</button> to pick a specific one.</p>
             </div>
             <fieldset class="group" id="micProcessing">
               <legend>Microphone processing</legend>
               <label class="check"><input type="checkbox" id="noiseSuppression" checked> <span>Noise suppression</span></label>
               <label class="check"><input type="checkbox" id="echoCancellation" checked> <span>Echo cancellation</span></label>
-              <label class="check"><input type="checkbox" id="leveling" checked> <span>Even out voice volume <small>Keeps quiet and loud speech at a similar level</small></span></label>
+              <label class="check"><input type="checkbox" id="leveling" checked> <span>Even out voice volume</span></label>
             </fieldset>
-            <fieldset class="group">
-              <legend>Other audio</legend>
-              <label class="check"><input type="checkbox" id="systemAudio" checked> <span>Record tab or system audio <small>When the browser offers it for the source you pick</small></span></label>
-            </fieldset>
-
             <div class="field" id="cameraField">
-              <label class="field-label" for="cameraSelect">Webcam bubble</label>
+              <label class="field-label" for="cameraSelect">Camera</label>
               <div class="select-wrap"><select id="cameraSelect"><option value="none">No camera</option><option value="default">Default camera</option></select></div>
-              <p class="hint" id="cameraHint">
-                <button id="cameraAccessBtn" class="btn-link" type="button">Allow camera access</button> to choose a specific one.
-              </p>
-              <label class="field-label" for="cameraCorner">Corner</label>
-              <div class="select-wrap">
-                <select id="cameraCorner">
-                  <option value="br">Bottom right</option>
-                  <option value="bl">Bottom left</option>
-                  <option value="tr">Top right</option>
-                  <option value="tl">Top left</option>
-                </select>
-              </div>
+              <p class="hint" id="cameraHint"><button id="cameraAccessBtn" class="btn-link" type="button">Allow access</button> to pick a specific one.</p>
+              <input type="hidden" id="cameraCorner" value="br">
             </div>
             <div class="field">
               <label class="field-label" for="autoStopSelect">Stop automatically after</label>
@@ -318,20 +336,14 @@
             </div>
             <fieldset class="group" id="savingGroup">
               <legend>While recording, save to</legend>
-              <label class="check" id="saveModeBrowserLabel"><input type="radio" name="saveMode" id="saveModeBrowser" value="browser" checked> <span>Browser storage <small>Recommended. Survives crashes; save it when you’re done</small></span></label>
-              <label class="check" id="saveModeFileLabel" hidden><input type="radio" name="saveMode" id="saveModeFile" value="file"> <span>A file you choose <small>Pick a location before recording, such as an external drive</small></span></label>
-              <label class="check" id="saveModeMemoryLabel" hidden><input type="radio" name="saveMode" id="saveModeMemory" value="memory"> <span>Memory only <small>Kept until you save it, but lost if the browser crashes</small></span></label>
-              <p class="hint" id="storageHint" hidden>Browser storage isn’t available here. If you opened this page as a file, serving it from localhost should fix that.</p>
+              <label class="check" id="saveModeBrowserLabel"><input type="radio" name="saveMode" id="saveModeBrowser" value="browser" checked> <span>Browser storage <small>Survives a crash</small></span></label>
+              <label class="check" id="saveModeFileLabel" hidden><input type="radio" name="saveMode" id="saveModeFile" value="file"> <span>A file you choose <small>Such as on an external drive</small></span></label>
+              <label class="check" id="saveModeMemoryLabel" hidden><input type="radio" name="saveMode" id="saveModeMemory" value="memory"> <span>Memory only <small>Lost if the browser crashes</small></span></label>
+              <p class="hint" id="storageHint" hidden>Browser storage isn’t available here. Serving the page from localhost should fix that.</p>
             </fieldset>
           </div>
         </fieldset>
       </details>
-
-      <p id="toolsRow" class="tools">
-        <button id="repairBtn" class="btn-link" type="button">Repair a recording…</button>
-        Fixes the length and seeking of WebM and MP4 files that were cut off, including Chrome’s <code>.crswap</code> files.
-        <input id="repairInput" type="file" accept=".webm,.mp4,.m4a,.crswap,video/webm,video/mp4,audio/mp4,audio/webm" hidden>
-      </p>
 
       <p id="status" class="status" role="status" aria-live="polite"></p>
     </div>
@@ -342,17 +354,26 @@
       <h2 id="confirmTitle"></h2>
       <p id="confirmBody"></p>
       <div class="toolbar">
-        <button id="confirmCancel" class="btn btn-secondary" value="cancel">Cancel</button>
+        <button id="confirmCancel" class="btn btn-ghost" value="cancel">Cancel</button>
         <button id="confirmOk" class="btn btn-danger" value="ok">OK</button>
       </div>
     </form>
   </dialog>
 
-  <footer class="shortcuts" aria-labelledby="shortcutsHeading">
-    <h2 id="shortcutsHeading">Keyboard shortcuts</h2>
-    <ul id="shortcutList"></ul>
-    <h2 id="playerShortcutsHeading">In the player</h2>
-    <ul id="playerShortcutList" aria-labelledby="playerShortcutsHeading"></ul>
+  <footer class="footer">
+    <div class="shortcuts" aria-labelledby="shortcutsHeading">
+      <h2 id="shortcutsHeading" class="visually-hidden">Keyboard shortcuts</h2>
+      <ul id="shortcutList"></ul>
+      <h2 id="playerShortcutsHeading" class="visually-hidden">In the player</h2>
+      <ul id="playerShortcutList" aria-labelledby="playerShortcutsHeading"></ul>
+    </div>
+    <p id="toolsRow" class="tools">
+      <button id="repairBtn" class="btn-link" type="button" aria-describedby="repairHint">
+        <svg class="icon" aria-hidden="true"><use href="#i-wrench"/></svg>Repair a recording
+      </button>
+      <span id="repairHint" class="visually-hidden">Fixes the length and seeking of WebM and MP4 files that were cut off, including Chrome’s .crswap files.</span>
+      <input id="repairInput" type="file" accept=".webm,.mp4,.m4a,.crswap,video/webm,video/mp4,audio/mp4,audio/webm" hidden>
+    </p>
   </footer>
 </div>
 </body>

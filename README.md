@@ -11,7 +11,10 @@ A screen recorder that runs entirely in your browser. Nothing is uploaded: recor
 - Separate volume sliders and level meters for your mic and the tab's audio, adjustable while recording.
 - Audio-only mode, for meetings and voice notes, with much smaller files.
 - Show up to two windows, tabs, or screens at once, side by side or one above the other, plus a webcam bubble (Chrome and Edge). The layout is chosen automatically to make both as big as possible, and described out loud: where each source is and roughly how big its text will look.
-- **Set up before recording:** on the main screen, share your sources and camera and check the layout first. You stay on the page while you share, and nothing is recorded until you start. When you start, three short beeps and a long one give you time to switch to what you're recording; recording begins right after the long beep. (With nothing shared, Start recording asks what to record and begins straight away.)
+- **Set up before recording:** on the main screen, share your sources and camera and check the layout first. You stay on the page while you share, and nothing is recorded until you start. Recording starts as soon as you press Start recording. (With nothing shared, it asks what to record first.)
+- Name each source (browsers don't tell the page a window's title), make one bigger than the other with **Size balance** (remembered for next time), and view the live preview full screen to check readability.
+- **Camera only:** with nothing else shared, the camera fills the frame; it shrinks to a corner bubble when you share a screen.
+- **Add sound:** record a tab's audio without showing it, such as music playing in the background (up to two).
 - Add, replace, or remove sources and the camera while recording, swap sides, change the layout, or move the camera to another corner. Hiding the camera keeps it on; removing it turns it off.
 - An optional automatic stop after 15 minutes to 2 hours.
 - Pause and resume, mute the mic, and add markers as you go.
@@ -38,14 +41,13 @@ Also: keyboard shortcuts, screen reader support, light and dark mode, works offl
 
 | Shortcut (Alt, or Option on a Mac) | Action |
 |---|---|
-| Alt+R | Start recording right away, or start a new one |
-| Alt+Shift+R | Count in with beeps, then record (Chrome and Edge) |
+| Alt+R | Start recording, or start a new one |
 | Alt+P | Pause or resume |
 | Alt+M | Mute or unmute the microphone |
 | Alt+K | Add a marker |
 | Alt+C | Show or hide the webcam bubble |
 | Alt+S | Stop |
-| Escape | Close the open panel (Settings, Trim, Markers), or cancel the count-in |
+| Escape | Close the open panel (Settings, Trim, Markers) |
 
 ## Running it locally
 
