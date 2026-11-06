@@ -7,7 +7,7 @@ A screen recorder that runs entirely in your browser. Nothing is uploaded: recor
 ## Features
 
 **Recording**
-- Record screens, windows, and tabs, with your microphone and the tabs' sound mixed in.
+- Record screens, windows, and tabs, with your microphone and the tabs' sound mixed in (choose whether to share a tab's sound in the browser's picker).
 - **Record starts straight away** with whatever you've set up, even nothing: you can add, replace, or remove sources, the camera, the mic, and sound while recording or paused. With nothing in the frame, the video is black.
 - Show up to two windows, tabs, or screens at once, side by side or one above the other. The layout is chosen automatically to make both as big as possible.
 - **Camera:** the toggle really turns the camera (and its light) on and off, as in a video call. With nothing else shared, the camera fills the frame; with a source, it's a circle in the corner you pick.

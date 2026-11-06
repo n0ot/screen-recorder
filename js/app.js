@@ -6,7 +6,7 @@ const els = {
   stage: $('stage'), stageEmpty: $('stageEmpty'), stageTitle: $('stageTitle'), stageText: $('stageText'), video: $('video'),
   installBtn: $('installBtn'),
   setupView: $('setupView'), startBtn: $('startBtn'), modeSwitch: $('modeSwitch'),
-  setupTools: $('setupTools'), avTools: $('avTools'), micOn: $('micOn'), camOn: $('camOn'), cameraTool: $('cameraTool'), tabAudioTool: $('tabAudioTool'),
+  setupTools: $('setupTools'), avTools: $('avTools'), micOn: $('micOn'), camOn: $('camOn'), cameraTool: $('cameraTool'),
   sourcesPanel: $('sourcesPanel'), sourceList: $('sourceList'),
   addSourceBtn: $('addSourceBtn'), addSourceLabel: $('addSourceLabel'),
   layoutSelect: $('layoutSelect'), swapBtn: $('swapBtn'),
@@ -27,7 +27,7 @@ const els = {
   addMarkerHereBtn: $('addMarkerHereBtn'), copyChaptersBtn: $('copyChaptersBtn'),
   settings: $('settings'), settingsBody: $('settingsBody'), settingsSummary: $('settingsSummary'),
   micSelect: $('micSelect'), micProcessing: $('micProcessing'),
-  noiseSuppression: $('noiseSuppression'), echoCancellation: $('echoCancellation'), leveling: $('leveling'), systemAudio: $('systemAudio'),
+  noiseSuppression: $('noiseSuppression'), echoCancellation: $('echoCancellation'), leveling: $('leveling'),
   recordModeInputs: [...document.querySelectorAll('input[name="recordMode"]')],
   qualityField: $('qualityField'), qualitySelect: $('qualitySelect'),
   formatSelect: $('formatSelect'),
@@ -159,9 +159,9 @@ function readSettings() {
     noiseSuppression: els.noiseSuppression.checked,
     echoCancellation: els.echoCancellation.checked,
     leveling: els.leveling.checked,
-    // Sound from shared tabs (Chrome and Edge). Audio-only recordings use Add sound instead.
-    tabAudio: els.systemAudio.checked,
-    systemAudio: els.systemAudio.checked && canTabAudio && radioValue(els.recordModeInputs) !== 'audio',
+    // Ask for shared tabs' sound where browsers support it; whether to include it is chosen in the
+    // browser's picker. Audio-only recordings use Add sound instead.
+    systemAudio: canTabAudio && radioValue(els.recordModeInputs) !== 'audio',
     recordMode: radioValue(els.recordModeInputs) || 'screen',
     quality: els.qualitySelect.value || 'standard',
     format: currentFormat(),
@@ -211,8 +211,6 @@ function loadSettings() {
   for (const key of ['noiseSuppression', 'echoCancellation', 'leveling']) {
     if (typeof s[key] === 'boolean') els[key].checked = s[key];
   }
-  const tab = typeof s.tabAudio === 'boolean' ? s.tabAudio : s.systemAudio;
-  if (typeof tab === 'boolean') els.systemAudio.checked = tab;
   // Both start off, then remember what you last chose.
   els.micOn.checked = typeof s.micOn === 'boolean' ? s.micOn : !!(s.micId && s.micId !== 'none');
   els.camOn.checked = typeof s.cameraOn === 'boolean' ? s.cameraOn : !!(s.cameraId && s.cameraId !== 'none');
@@ -395,11 +393,14 @@ async function openBrowserOutput(name) {
   return { kind: 'browser', name, release, queue: Promise.resolve(), bytes: 0, failed: false };
 }
 
-async function lowSpaceWarning() {
+// Warns only when the free space holds less than about 15 minutes at the chosen quality.
+async function lowSpaceWarning(settings) {
   try {
     const { quota, usage } = await navigator.storage.estimate();
     const free = quota - usage;
-    if (free < 2 * 1024 ** 3) return `Low storage: ${formatBytes(free)} free.`;
+    const preset = PRESETS[settings.quality];
+    const bps = settings.recordMode === 'audio' ? preset.audio : preset.video * FORMATS[settings.format].bitrate + preset.audio;
+    if (free < (bps / 8) * 15 * 60) return `Low storage: ${formatBytes(free)} free.`;
   } catch { /* unknown */ }
   return '';
 }
@@ -930,7 +931,6 @@ async function addSource() {
   if (!rec && !(phase === 'setup' && multiSourceMode() && ensureSession())) return;
   if (!rec.compositor || rec.sources.length >= 2) return;
   let added = false;
-  const first = !rec.sources.length;
   switching = true;
   render();
   try {
@@ -1516,7 +1516,7 @@ async function prepareRecording(session) {
   if (mode === 'browser') {
     try {
       session.output = await openBrowserOutput(session.filename);
-      const low = await lowSpaceWarning();
+      const low = await lowSpaceWarning(settings);
       if (low) warnings.push(low);
       if (navigator.storage.persist) navigator.storage.persist().catch(() => {});
     } catch (err) {
@@ -1535,10 +1535,6 @@ async function prepareRecording(session) {
     }
   }
   refreshDevices(); // labels become available once permission is granted
-  const first = session.sources[0];
-  if (settings.systemAudio && first && ![...session.sources, ...session.sounds].some((s) => s.stream.getAudioTracks().length)) {
-    warnings.push('No tab sound shared.');
-  }
 
   const fail = (message) => {
     rec = null;
@@ -2251,7 +2247,6 @@ function render() {
   els.cameraTool.hidden = !cameraAllowed();
   els.camOn.disabled = avLocked || cameraBusy;
   els.cameraSelect.disabled = avLocked || cameraBusy;
-  els.tabAudioTool.hidden = !canTabAudio || audioOnly;
 
   // Sources, sound, and the camera's corner: on the main screen and while recording
   const n = rec ? rec.sources.length : 0;
@@ -2465,7 +2460,7 @@ els.repairInput.addEventListener('change', () => {
   if (file) repairFile(file);
 });
 els.settings.addEventListener('toggle', () => store.set('settingsOpen', els.settings.open));
-[els.noiseSuppression, els.echoCancellation, els.leveling, els.systemAudio, els.qualitySelect, els.formatSelect,
+[els.noiseSuppression, els.echoCancellation, els.leveling, els.qualitySelect, els.formatSelect,
   els.autoStopSelect, ...els.recordModeInputs, ...els.saveModeInputs]
   .forEach((el) => el.addEventListener('change', () => { saveSettings(); render(); }));
 for (const [input, key] of [[els.micVolume, 'mic'], [els.tabVolume, 'tab']]) {
