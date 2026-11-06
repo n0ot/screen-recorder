@@ -155,18 +155,26 @@ function announce(message, tone = 'info') {
 }
 
 // ---------- Settings ----------
+let cameraWanted = false; // remembered camera on/off, used until a session is running
 function radioValue(inputs) { const c = inputs.find((i) => i.checked); return c ? c.value : null; }
 function readSettings() {
   return {
-    micId: els.micSelect.value || 'default',
+    // On or off is chosen on the main screen; Settings only picks which device.
+    micOn: els.micOn.checked,
+    micDevice: els.micSelect.value || 'default',
+    micId: els.micOn.checked ? (els.micSelect.value || 'default') : 'none',
     noiseSuppression: els.noiseSuppression.checked,
     echoCancellation: els.echoCancellation.checked,
     leveling: els.leveling.checked,
-    systemAudio: els.systemAudio.checked,
+    // In audio-only recordings where sound can be added (Chrome and Edge), Add sound replaces this toggle.
+    tabAudio: els.systemAudio.checked,
+    systemAudio: els.systemAudio.checked && !(canComposite && radioValue(els.recordModeInputs) === 'audio'),
     recordMode: radioValue(els.recordModeInputs) || 'screen',
     quality: els.qualitySelect.value || 'standard',
     format: currentFormat(),
-    cameraId: els.cameraSelect.value || 'none',
+    cameraOn: cameraWanted,
+    cameraDevice: els.cameraSelect.value || 'default',
+    cameraId: cameraWanted ? (els.cameraSelect.value || 'default') : 'none',
     cameraCorner: els.cameraCorner.value || 'br',
     autoStop: Number(els.autoStopSelect.value) || 0,
     saveMode: currentSaveMode(),
@@ -207,14 +215,17 @@ function applySaveModes() {
 }
 function loadSettings() {
   const s = store.get('settings', {});
-  for (const key of ['noiseSuppression', 'echoCancellation', 'leveling', 'systemAudio']) {
+  for (const key of ['noiseSuppression', 'echoCancellation', 'leveling']) {
     if (typeof s[key] === 'boolean') els[key].checked = s[key];
   }
+  const tab = typeof s.tabAudio === 'boolean' ? s.tabAudio : s.systemAudio;
+  if (typeof tab === 'boolean') els.systemAudio.checked = tab;
+  els.micOn.checked = typeof s.micOn === 'boolean' ? s.micOn : s.micId !== 'none';
+  cameraWanted = typeof s.cameraOn === 'boolean' ? s.cameraOn : !!(s.cameraId && s.cameraId !== 'none');
   if (s.recordMode) els.recordModeInputs.forEach((i) => { i.checked = i.value === s.recordMode; });
   if (PRESETS[s.quality]) els.qualitySelect.value = s.quality;
   if (s.autoStop != null) els.autoStopSelect.value = String(s.autoStop);
   if (s.cameraCorner) { els.cameraCorner.value = s.cameraCorner; setRadioGroup(els.liveCorner, s.cameraCorner); }
-  if (s.micId === 'none') els.micSelect.value = 'none';
   for (const [key, el] of [['micVolume', els.micVolume], ['tabVolume', els.tabVolume]]) {
     if (typeof s[key] === 'number') el.value = String(s[key]);
   }
@@ -258,15 +269,12 @@ function updateSettingsUI() {
   els.cameraField.hidden = !canComposite || audioOnly;
   els.cameraCorner.disabled = s.cameraId === 'none';
 
-  els.micProcessing.disabled = s.micId === 'none';
-  els.micOn.checked = s.micId !== 'none';
-
   const opt = els.micSelect.selectedOptions[0];
-  let mic = s.micId === 'none' ? 'No mic' : (s.micId === 'default' ? 'Default mic' : (opt ? opt.textContent : 'Mic'));
+  let mic = s.micDevice === 'default' ? 'Default mic' : (opt ? opt.textContent : 'Mic');
   if (mic.length > 24) mic = mic.slice(0, 23) + '…';
   const what = audioOnly ? 'Audio only' : `${{ compact: 'Compact', standard: 'Standard', high: 'High' }[s.quality]} ${s.format === 'mp4' ? 'MP4' : s.format === 'av1' ? 'AV1' : 'WebM'}`;
   const saving = { browser: 'Saves as it records', file: 'Saves to a file' }[s.saveMode] || '';
-  els.settingsSummary.textContent = [what, mic, s.cameraId !== 'none' && !audioOnly && canComposite ? 'Camera on' : '', saving]
+  els.settingsSummary.textContent = [what, s.micOn ? mic : '', saving]
     .filter(Boolean).join(' · ');
 }
 function updateVolumeOutputs() {
@@ -285,14 +293,14 @@ async function refreshDevices() {
   catch (err) { console.warn('Could not list devices', err); }
   const saved = store.get('settings', {});
   fillDeviceSelect(els.micSelect, devices.filter((d) => d.kind === 'audioinput'), {
-    wanted: els.micSelect.value || saved.micId || 'default', defaultLabel: 'Default microphone', noneLabel: 'No microphone', noneFirst: false, hint: els.micHint,
+    wanted: els.micSelect.value || saved.micDevice || saved.micId || 'default', defaultLabel: 'Default microphone', hint: els.micHint,
   });
   fillDeviceSelect(els.cameraSelect, devices.filter((d) => d.kind === 'videoinput'), {
-    wanted: els.cameraSelect.value || saved.cameraId || 'none', defaultLabel: 'Default camera', noneLabel: 'No camera', noneFirst: true, hint: els.cameraHint,
+    wanted: els.cameraSelect.value || saved.cameraDevice || saved.cameraId || 'default', defaultLabel: 'Default camera', hint: els.cameraHint,
   });
   updateSettingsUI();
 }
-function fillDeviceSelect(select, devices, { wanted, defaultLabel, noneLabel, noneFirst, hint }) {
+function fillDeviceSelect(select, devices, { wanted, defaultLabel, hint }) {
   const hasLabels = devices.some((d) => d.label);
   const defaultDevice = devices.find((d) => d.deviceId === 'default');
   const defaultName = defaultDevice && defaultDevice.label ? defaultDevice.label.replace(/^Default\s*-\s*/i, '') : '';
@@ -303,9 +311,8 @@ function fillDeviceSelect(select, devices, { wanted, defaultLabel, noneLabel, no
       options.push([d.deviceId, d.label || defaultLabel]);
     }
   }
-  if (noneFirst) options.unshift(['none', noneLabel]); else options.push(['none', noneLabel]);
   select.replaceChildren(...options.map(([value, text]) => new Option(text, value)));
-  select.value = options.some(([v]) => v === wanted) ? wanted : options[noneFirst ? 0 : 0][0];
+  select.value = options.some(([v]) => v === wanted) ? wanted : 'default';
   hint.hidden = hasLabels || devices.length === 0;
 }
 async function requestDeviceAccess(kind) {
@@ -1086,14 +1093,12 @@ async function addCamera() {
   switching = true;
   render();
   try {
-    const has = (v) => [...els.cameraSelect.options].some((o) => o.value === v);
-    const chosen = els.cameraSelect.value !== 'none' ? els.cameraSelect.value : store.get('lastCamera', 'default');
-    const s = { ...rec.settings, cameraId: chosen && chosen !== 'none' && has(chosen) ? chosen : 'default' };
+    const s = { ...rec.settings, cameraId: els.cameraSelect.value || 'default' };
     const cam = await getCamera(s);
     if (!rec) { stopStream(cam); return; }
     attachCamera(cam);
     refreshDevices();
-    if (els.cameraSelect.value === 'none') { els.cameraSelect.value = s.cameraId; saveSettings(); }
+    if (!cameraWanted) { cameraWanted = true; saveSettings(); }
     announce(rec.sources.length ? `Camera added in the ${cornerName(rec.corner)} corner.` : 'Camera on. It fills the frame until you add a screen, window, or tab.');
   } catch (err) {
     announce(err.name === 'NotAllowedError' ? 'Camera access was blocked.' : `Couldn’t open the camera: ${err.message || err.name}`, 'error');
@@ -1123,7 +1128,7 @@ function removeCamera() {
   rec.camStream = null;
   rec.compositor.setCamera(null);
   stopStream(cam); // turns the camera (and its light) off
-  if (els.cameraSelect.value !== 'none') { store.set('lastCamera', els.cameraSelect.value); els.cameraSelect.value = 'none'; saveSettings(); }
+  if (cameraWanted) { cameraWanted = false; saveSettings(); }
   if (phase === 'arranging' && sessionIsEmpty()) cancelArrange('Camera off.', { quiet: true });
   else announce('Camera removed and turned off.');
   render();
@@ -1293,10 +1298,9 @@ function renderSounds() {
 // The choice is remembered, so a recording started straight from Record includes it too.
 function onCameraButton() {
   if (switching) return;
-  if (!rec && els.cameraSelect.value !== 'none') {
+  if (!rec && cameraWanted) {
     // Remembered as on, but not running yet: turn it off.
-    store.set('lastCamera', els.cameraSelect.value);
-    els.cameraSelect.value = 'none';
+    cameraWanted = false;
     saveSettings();
     renderSources();
     render();
@@ -1306,15 +1310,7 @@ function onCameraButton() {
   if (!ensureSession()) return;
   if (rec.camStream) removeCamera(); else addCamera();
 }
-// The mic toggle mirrors the microphone choice in Settings.
-function onMicToggle() {
-  if (!els.micOn.checked) { if (els.micSelect.value !== 'none') store.set('lastMic', els.micSelect.value); els.micSelect.value = 'none'; }
-  else {
-    const last = store.get('lastMic', 'default');
-    els.micSelect.value = [...els.micSelect.options].some((o) => o.value === last && last !== 'none') ? last : 'default';
-  }
-  saveSettings();
-}
+function onMicToggle() { saveSettings(); render(); }
 
 // ---------- Recording flow ----------
 // A session holds everything that's being captured; the recorder is added when recording starts.
@@ -1404,9 +1400,8 @@ async function startRecording() {
   const settings = readSettings();
   const audioOnly = settings.recordMode === 'audio';
   if (audioOnly && settings.micId === 'none' && !settings.systemAudio) {
-    announce('To record audio only, choose a microphone or turn on tab or system audio in Settings.', 'error');
-    els.settings.open = true;
-    els.micSelect.focus();
+    announce(canComposite ? 'Nothing to record. Turn on the mic or add sound.' : 'Nothing to record. Turn on the mic or tab audio.', 'error');
+    els.micOn.focus();
     return;
   }
   if (!(await confirmReplacingRecovery()) || phase !== 'setup') return;
@@ -1478,9 +1473,11 @@ async function shareFirstSource() {
 }
 
 // Starts an empty session on the main screen, so the camera or sound can come before any screen.
+// Screen recordings get a compositor; audio-only ones just mix sound (Chrome and Edge).
+function canArrange() { return canRecord && canComposite; }
 function ensureSession() {
-  if (rec) return !!rec.compositor;
-  if (phase !== 'setup' || !multiSourceMode()) return false;
+  if (rec) return !!(rec.compositor || rec.audioOnly);
+  if (phase !== 'setup' || !canArrange()) return false;
   rec = createSession(readSettings(), []);
   rec.arranged = true;
   showPreview(rec);
@@ -1520,7 +1517,7 @@ function refreshSessionSettings(session) {
   }
   if (session.mixer) session.mixer.close();
   session.mixer = null;
-  if (settings.systemAudio || settings.micId !== 'none' || session.compositor) {
+  if (session.audioOnly || settings.systemAudio || settings.micId !== 'none' || session.compositor) {
     session.mixer = createMixer(settings);
     for (const src of [...session.sources, ...session.sounds]) session.mixer.setDisplay(src.id, src.stream);
   }
@@ -1610,8 +1607,10 @@ async function prepareRecording(session) {
   };
   if (rec !== session) { teardownCapture(session); discardOutput(session.output); return; }
   if (first && first.track.readyState === 'ended' && session.sources.length === 1) return fail('Sharing ended before recording started.');
-  if (session.audioOnly && !session.micStream && !session.sources.some((s) => s.stream.getAudioTracks().length)) {
-    return fail('There’s no audio to record: no microphone could be opened and the source didn’t share audio.');
+  if (session.audioOnly && !session.micStream && ![...session.sources, ...session.sounds].some((s) => s.stream.getAudioTracks().length)) {
+    return fail(session.micStream === null && settings.micId === 'none'
+      ? 'Nothing to record. Turn on the mic or add sound.'
+      : 'There’s no audio to record: no microphone could be opened and nothing shared any sound.');
   }
 
   const fmt = FORMATS[settings.format];
@@ -2356,15 +2355,23 @@ function render() {
   // Only screen readers get this; sighted people can see what's shared.
   els.startHint.textContent = !canRecord ? ''
     : shared ? 'Recording starts straight away.'
-    : audioOnly ? 'Records your microphone and, if it’s on, a tab’s audio.'
+    : audioOnly ? (canArrange() ? 'Records your microphone and any sound you add.' : 'Records your microphone and, if it’s on, a tab’s audio.')
     : multi ? 'Nothing is shared yet, so this asks what to record, then starts straight away.'
     : 'Asks what to record, then starts straight away.';
   els.modeSwitch.hidden = !canRecord || !!rec;
 
   // Sources and camera (Chrome and Edge): on the main screen and while recording
   const n = rec ? rec.sources.length : 0;
-  const showSources = multi && (main || phase === 'recording' || phase === 'paused');
-  els.sourcesPanel.hidden = !showSources;
+  const barShown = main || phase === 'recording' || phase === 'paused';
+  const showSources = multi && barShown;
+  // Audio only (Chrome and Edge): just the sound controls.
+  const soundsOnly = !multi && audioOnly && canArrange() && (!rec || rec.audioOnly) && barShown;
+  const showBar = showSources || soundsOnly;
+  els.sourcesPanel.hidden = !showBar;
+  els.cameraManageBtn.hidden = soundsOnly;
+  els.liveCorner.hidden = soundsOnly;
+  els.sourcesPanel.querySelector('.bar-divider').hidden = soundsOnly;
+  els.systemAudio.closest('.tool').hidden = audioOnly && canArrange();
   const canAdd = showSources && (rec ? n < 2 : phase === 'setup' && !switching);
   const visual = !!rec && !audioOnly && (n > 0 || !!rec.camStream);
   els.addSourceBtn.hidden = !canAdd;
@@ -2373,15 +2380,16 @@ function render() {
   els.sourceList.hidden = !showSources || !n;
   els.previewBtn.hidden = !showSources || !visual || !els.video.requestFullscreen;
   els.stage.dataset.phase = phase;
-  if (showSources) {
-    els.addSourceBtn.disabled = false;
-    els.addSoundBtn.hidden = false;
-    els.layoutSelect.disabled = n < 2;
-    els.swapBtn.disabled = n < 2;
-    els.cameraManageBtn.disabled = switching;
+  if (showBar) {
     els.addSoundBtn.disabled = switching || (!!rec && !rec.mixer);
     els.addSoundBtn.hidden = !!rec && rec.sounds.length >= 2;
     els.soundList.querySelectorAll('button').forEach((b) => { b.disabled = switching; });
+  }
+  if (showSources) {
+    els.addSourceBtn.disabled = false;
+    els.layoutSelect.disabled = n < 2;
+    els.swapBtn.disabled = n < 2;
+    els.cameraManageBtn.disabled = switching;
     els.liveCorner.disabled = !(rec ? rec.camStream : readSettings().cameraId !== 'none');
     els.sourceList.querySelectorAll('button').forEach((b) => { b.disabled = switching; });
   }

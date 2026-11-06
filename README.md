@@ -9,9 +9,9 @@ A screen recorder that runs entirely in your browser. Nothing is uploaded: recor
 **Recording**
 - Record a screen, window, or tab, with your microphone and the tab's or system audio mixed in.
 - Separate volume sliders and level meters for your mic and the tab's audio, adjustable while recording.
-- Audio-only mode, for meetings and voice notes, with much smaller files.
+- Audio-only mode, for meetings and voice notes, with much smaller files. Add sound from up to two tabs, with or without your mic (Chrome and Edge).
 - Show up to two windows, tabs, or screens at once, side by side or one above the other, plus a webcam bubble (Chrome and Edge). The layout is chosen automatically to make both as big as possible, and described out loud: where each source is and roughly how big its text will look.
-- **Set up before recording:** on the main screen, share your sources and camera and check the layout first. You stay on the page while you share, and nothing is recorded until you start. Recording starts as soon as you press Start recording. (With nothing shared, it asks what to record first.)
+- **Set up before recording:** on the main screen, share your sources, turn the mic, camera, and tab audio on or off, and check the layout. Settings only picks which mic and camera to use. You stay on the page while you share, and nothing is recorded until you start. Recording starts as soon as you press Start recording. (With nothing shared, it asks what to record first.)
 - Name each source (browsers don't tell the page a window's title), make one bigger than the other with **Size balance** (remembered for next time), and view the live preview full screen to check readability.
 - **Camera only:** with nothing else shared, the camera fills the frame; it shrinks to a corner bubble when you share a screen.
 - **Add sound:** record a tab's audio without showing it, such as music playing in the background (up to two).
