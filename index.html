@@ -24,6 +24,7 @@
     <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></symbol>
     <symbol id="i-mic-off" viewBox="0 0 24 24"><path d="M2 2l20 20M9 9v2a3 3 0 0 0 5.1 2.1M15 9.3V5a3 3 0 0 0-5.7-1.3M5 11a7 7 0 0 0 11.6 5.3M19 11a7 7 0 0 1-.6 2.8M12 18v4"/></symbol>
     <symbol id="i-cam" viewBox="0 0 24 24"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></symbol>
+    <symbol id="i-cam-off" viewBox="0 0 24 24"><path d="M2 2l20 20M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2M9.7 5H14a2 2 0 0 1 2 2v3.3l1 1L23 7v10"/></symbol>
     <symbol id="i-sound" viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></symbol>
     <symbol id="i-sound-off" viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M22 9l-6 6M16 9l6 6"/></symbol>
     <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/></symbol>
@@ -87,23 +88,21 @@
       <button id="previewBtn" class="stage-icon-btn" type="button" aria-label="View preview full screen" title="Full screen" hidden>
         <svg class="icon" aria-hidden="true"><use href="#i-expand"/></svg>
       </button>
+      <p id="stageNotice" class="stage-notice" hidden></p>
       <div id="stageToast" class="stage-toast" aria-hidden="true" hidden></div>
     </div>
 
     <!-- Composition: camera and layout (Chrome and Edge) -->
     <div id="sourcesPanel" class="stage-bar" hidden>
       <div class="bar-group">
-        <button id="cameraManageBtn" class="chip" type="button" aria-pressed="false">
-          <svg class="icon" aria-hidden="true"><use href="#i-cam"/></svg><span id="cameraManageLabel">Camera</span>
-        </button>
-        <fieldset id="liveCorner" class="corner-picker" disabled>
+        <fieldset id="liveCorner" class="corner-picker" hidden>
           <legend class="visually-hidden">Camera corner</legend>
           <label title="Top left"><input type="radio" name="corner" value="tl"><span class="visually-hidden">Top left</span></label>
           <label title="Top right"><input type="radio" name="corner" value="tr"><span class="visually-hidden">Top right</span></label>
           <label title="Bottom left"><input type="radio" name="corner" value="bl"><span class="visually-hidden">Bottom left</span></label>
           <label title="Bottom right"><input type="radio" name="corner" value="br" checked><span class="visually-hidden">Bottom right</span></label>
         </fieldset>
-        <span class="bar-divider" aria-hidden="true"></span>
+        <span id="cornerDivider" class="bar-divider" aria-hidden="true"></span>
         <ul id="soundList" class="sound-list" aria-label="Sound only" hidden></ul>
         <button id="addSoundBtn" class="chip" type="button" aria-describedby="addSoundHint">
           <svg class="icon" aria-hidden="true"><use href="#i-music"/></svg><span>Add sound</span>
@@ -142,13 +141,27 @@
         <button id="startBtn" class="record-btn" type="button" aria-keyshortcuts="Alt+R" aria-describedby="startHint">
           <span class="record-dot" aria-hidden="true"></span><span>Record</span>
         </button>
-        <div class="dock-group">
-          <label class="tool">
-            <input type="checkbox" id="micOn" class="tool-input" checked>
-            <span class="tool-icon"><svg class="icon on" aria-hidden="true"><use href="#i-mic"/></svg><svg class="icon off" aria-hidden="true"><use href="#i-mic-off"/></svg></span>
-            <span class="tool-label">Mic</span>
-          </label>
-          <label class="tool">
+        <div class="dock-group" id="setupTools">
+          <!-- The mic and camera: here before recording, in the recording controls while recording -->
+          <div id="avTools" class="av-tools">
+            <div class="tool-wrap">
+              <label class="tool">
+                <input type="checkbox" id="micOn" class="tool-input" aria-keyshortcuts="Alt+M">
+                <span class="tool-icon"><svg class="icon on" aria-hidden="true"><use href="#i-mic"/></svg><svg class="icon off" aria-hidden="true"><use href="#i-mic-off"/></svg></span>
+                <span class="tool-label">Mic</span>
+              </label>
+              <select id="micSelect" class="tool-menu" aria-label="Microphone" title="Choose microphone"><option value="default">Default microphone</option></select>
+            </div>
+            <div class="tool-wrap" id="cameraTool">
+              <label class="tool">
+                <input type="checkbox" id="camOn" class="tool-input" aria-keyshortcuts="Alt+C">
+                <span class="tool-icon"><svg class="icon on" aria-hidden="true"><use href="#i-cam"/></svg><svg class="icon off" aria-hidden="true"><use href="#i-cam-off"/></svg></span>
+                <span class="tool-label">Camera</span>
+              </label>
+              <select id="cameraSelect" class="tool-menu" aria-label="Camera" title="Choose camera"><option value="default">Default camera</option></select>
+            </div>
+          </div>
+          <label class="tool" id="tabAudioTool">
             <input type="checkbox" id="systemAudio" class="tool-input" checked>
             <span class="tool-icon"><svg class="icon on" aria-hidden="true"><use href="#i-sound"/></svg><svg class="icon off" aria-hidden="true"><use href="#i-sound-off"/></svg></span>
             <span class="tool-label">Tab audio</span>
@@ -171,21 +184,9 @@
                 <span class="tool-icon"><svg id="pauseIcon" class="icon" aria-hidden="true"><use href="#i-pause"/></svg><svg id="resumeIcon" class="icon" aria-hidden="true" hidden><use href="#i-play"/></svg></span>
                 <span id="pauseLabel" class="tool-label">Pause</span>
               </button>
-              <button id="muteBtn" class="tool" type="button" aria-keyshortcuts="Alt+M">
-                <span class="tool-icon"><svg id="micOnIcon" class="icon" aria-hidden="true"><use href="#i-mic"/></svg><svg id="micOffIcon" class="icon" aria-hidden="true" hidden><use href="#i-mic-off"/></svg></span>
-                <span id="muteLabel" class="tool-label">Mute</span>
-              </button>
-              <button id="cameraBtn" class="tool" type="button" aria-keyshortcuts="Alt+C" hidden>
-                <span class="tool-icon"><svg class="icon" aria-hidden="true"><use href="#i-cam"/></svg></span>
-                <span id="cameraLabel" class="tool-label">Hide camera</span>
-              </button>
               <button id="markerBtn" class="tool" type="button" aria-keyshortcuts="Alt+K">
                 <span class="tool-icon"><svg class="icon" aria-hidden="true"><use href="#i-marker"/></svg></span>
                 <span class="tool-label">Marker</span>
-              </button>
-              <button id="switchBtn" class="tool hide-in-pip" type="button">
-                <span class="tool-icon"><svg class="icon" aria-hidden="true"><use href="#i-switch"/></svg></span>
-                <span class="tool-label">Switch</span>
               </button>
               <button id="popoutBtn" class="tool hide-in-pip" type="button" aria-label="Floating controls">
                 <span class="tool-icon"><svg class="icon" aria-hidden="true"><use href="#i-pip"/></svg></span>
@@ -279,9 +280,9 @@
 
       <!-- Settings -->
       <details id="settings" class="drawer">
-        <summary><svg class="icon" aria-hidden="true"><use href="#i-gear"/></svg>Settings <span id="settingsSummary" class="drawer-summary"></span></summary>
+        <summary><svg class="icon" aria-hidden="true"><use href="#i-gear"/></svg>Recording options <span id="settingsSummary" class="drawer-summary"></span></summary>
         <fieldset id="settingsBody" class="drawer-body">
-          <legend class="visually-hidden">Recording settings</legend>
+          <legend class="visually-hidden">Recording options</legend>
           <div class="settings-grid">
             <div class="field" id="qualityField">
               <label class="field-label" for="qualitySelect">Quality</label>
@@ -305,23 +306,12 @@
               </div>
               <p class="hint" id="formatHint"></p>
             </div>
-            <div class="field">
-              <label class="field-label" for="micSelect">Microphone</label>
-              <div class="select-wrap"><select id="micSelect"><option value="default">Default microphone</option></select></div>
-              <p class="hint" id="micHint"><button id="micAccessBtn" class="btn-link" type="button">Allow access</button> to pick a specific one.</p>
-            </div>
             <fieldset class="group" id="micProcessing">
               <legend>Microphone processing</legend>
               <label class="check"><input type="checkbox" id="noiseSuppression" checked> <span>Noise suppression</span></label>
               <label class="check"><input type="checkbox" id="echoCancellation" checked> <span>Echo cancellation</span></label>
               <label class="check"><input type="checkbox" id="leveling" checked> <span>Even out voice volume</span></label>
             </fieldset>
-            <div class="field" id="cameraField">
-              <label class="field-label" for="cameraSelect">Camera</label>
-              <div class="select-wrap"><select id="cameraSelect"><option value="default">Default camera</option></select></div>
-              <p class="hint" id="cameraHint"><button id="cameraAccessBtn" class="btn-link" type="button">Allow access</button> to pick a specific one.</p>
-              <input type="hidden" id="cameraCorner" value="br">
-            </div>
             <div class="field">
               <label class="field-label" for="autoStopSelect">Stop automatically after</label>
               <div class="select-wrap">

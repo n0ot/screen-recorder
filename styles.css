@@ -235,7 +235,8 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .stage[data-phase="recording"] .stage-icon-btn, .stage[data-phase="paused"] .stage-icon-btn { opacity: 0; }
 .stage:hover .source-chip, .stage:focus-within .source-chip,
 .stage:hover .add-source, .stage:focus-within .add-source,
-.stage:hover .stage-icon-btn, .stage:focus-within .stage-icon-btn { opacity: 1; }
+.stage:hover .stage-icon-btn, .stage:focus-within .stage-icon-btn,
+.stage:not(.has-sources) .add-source { opacity: 1; }
 
 /* A small preview: keep the labels compact */
 @container (max-width: 620px) {
@@ -246,6 +247,14 @@ fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 }
 
 /* Playback speed and marker jumps */
+/* Shown on the preview (not recorded) while nothing is in the frame */
+.stage-notice {
+  position: absolute; z-index: 2; top: 14px; left: 50%; transform: translateX(-50%);
+  margin: 0; padding: 7px 14px; border-radius: 999px;
+  background: var(--glass); border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  color: #fff; font-size: 0.8125rem; font-weight: 600; white-space: nowrap;
+}
 .stage-toast {
   position: absolute; top: 16px; left: 50%; transform: translateX(-50%); z-index: 3;
   max-width: calc(100% - 32px);
@@ -401,6 +410,29 @@ input[type="range"] { accent-color: var(--accent); height: 24px; margin: 0; curs
 .tool:has(.tool-input:not(:checked)) .tool-icon { color: var(--muted); }
 .tool.is-active .tool-icon { background: rgb(217 45 32 / 0.12); color: var(--rec); border-color: transparent; }
 @media (prefers-color-scheme: dark) { .tool.is-active .tool-icon { background: rgb(255 69 58 / 0.2); color: #ff7b72; } }
+
+/* The mic and camera: a toggle with a small menu for choosing the device */
+.av-tools { display: contents; }
+.tool-wrap { position: relative; display: grid; }
+.tool-menu {
+  appearance: none; -webkit-appearance: none;
+  position: absolute; top: -5px; left: calc(50% + 13px);
+  width: 22px; height: 22px; min-height: 0; padding: 0; margin: 0;
+  border-radius: 50%; border: 1px solid var(--border);
+  background-color: var(--surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235d5d66' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: center; background-size: 12px;
+  color: transparent; font: inherit; font-size: 0.875rem;
+  text-indent: 40px; white-space: nowrap; overflow: hidden;
+  cursor: pointer; box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+}
+.tool-menu option { color: var(--text); background: var(--surface); }
+.tool-menu:hover { background-color: var(--surface-3); }
+.tool-menu:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
+@media (prefers-color-scheme: dark) {
+  .tool-menu { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b4b4bd' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); }
+}
+.pip-body .tool-menu { top: -4px; left: calc(50% + 11px); width: 20px; height: 20px; }
 
 /* Recording */
 .live { display: grid; gap: 12px; }
@@ -601,8 +633,10 @@ kbd {
   .dock { grid-template-columns: 1fr 1fr; }
   .dock > * { grid-row: auto; }
   .dock .record-btn { grid-column: 1 / -1; grid-row: 1; justify-self: stretch; justify-content: center; }
-  .mode-switch { grid-column: 1; justify-self: start; }
-  #setupView > .dock-group { grid-column: 2; justify-self: end; }
+  .mode-switch { grid-column: 1 / -1; grid-row: 3; justify-self: center; }
+  #setupView > .dock-group { grid-column: 1 / -1; grid-row: 2; justify-self: center; flex-wrap: nowrap; }
+  .dock-group { gap: 2px; }
+  .tool { min-width: 58px; padding: 2px; }
   #liveControls .dock .rec-pill { grid-column: 1; grid-row: 1; }
   #liveControls .dock .stop-btn { grid-column: 2; grid-row: 1; }
   #liveControls .dock > .dock-group { grid-column: 1 / -1; grid-row: 2; justify-self: center; }

@@ -135,7 +135,8 @@ async function webmParseHeader(blob) {
       break;
     }
     if (el.unknown || el.end > head.length) break;
-    if (el.id === SEEK_HEAD) h.hasSeekHead = true;
+    // Firefox leaves an empty index here, which is safe to drop; a real one would be invalidated.
+    if (el.id === SEEK_HEAD && el.size > 0) h.hasSeekHead = true;
     if (el.id === INFO) {
       h.info = el;
       for (let q = el.dataStart; q < el.end;) {

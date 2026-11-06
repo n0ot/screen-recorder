@@ -7,18 +7,18 @@ A screen recorder that runs entirely in your browser. Nothing is uploaded: recor
 ## Features
 
 **Recording**
-- Record a screen, window, or tab, with your microphone and the tab's or system audio mixed in.
-- Separate volume sliders and level meters for your mic and the tab's audio, adjustable while recording.
-- Audio-only mode, for meetings and voice notes, with much smaller files. Add sound from up to two tabs, with or without your mic (Chrome and Edge).
-- Show up to two windows, tabs, or screens at once, side by side or one above the other, plus a webcam bubble (Chrome and Edge). The layout is chosen automatically to make both as big as possible, and described out loud: where each source is and roughly how big its text will look.
-- **Set up before recording:** on the main screen, share your sources, turn the mic, camera, and tab audio on or off, and check the layout. Settings only picks which mic and camera to use. You stay on the page while you share, and nothing is recorded until you start. Recording starts as soon as you press Start recording. (With nothing shared, it asks what to record first.)
+- Record screens, windows, and tabs, with your microphone and the tabs' sound mixed in.
+- **Record starts straight away** with whatever you've set up, even nothing: you can add, replace, or remove sources, the camera, the mic, and sound while recording or paused. With nothing in the frame, the preview says so (the recording is just black), and only sound is recorded.
+- Show up to two windows, tabs, or screens at once, side by side or one above the other. The layout is chosen automatically to make both as big as possible, and described out loud: where each source is and roughly how big its text will look.
+- **Camera:** the toggle really turns the camera (and its light) on and off, as in a video call. With nothing else shared, the camera fills the frame; with a source, it's a circle in the corner you pick.
+- **Mic:** one toggle, before or during recording. The mic and camera start off and remember your last choice, and the small menu on each picks which device to use, also while recording.
+- Set things up first if you like: share sources on the main screen and check the layout. You stay on the page while you share, and nothing is recorded until you press Record.
 - Name each source (browsers don't tell the page a window's title), make one bigger than the other with **Size balance** (remembered for next time), and view the live preview full screen to check readability.
-- **Camera only:** with nothing else shared, the camera fills the frame; it shrinks to a corner bubble when you share a screen.
-- **Add sound:** record a tab's audio without showing it, such as music playing in the background (up to two).
-- Add, replace, or remove sources and the camera while recording, swap sides, change the layout, or move the camera to another corner. Hiding the camera keeps it on; removing it turns it off.
+- **Add sound** (Chrome and Edge): record a tab's sound without showing it, such as music playing in the background (up to two). Works in audio-only recordings too.
+- Audio-only mode, for meetings and voice notes, with much smaller files.
+- Separate volume sliders and level meters for your mic and the tabs' sound, adjustable while recording.
 - An optional automatic stop after 15 minutes to 2 hours.
-- Pause and resume, mute the mic, and add markers as you go.
-- Switch to a different screen or tab without stopping (Chrome and Edge).
+- Pause and resume, and add markers as you go.
 - Floating controls that stay visible while you work in other tabs (Chrome and Edge).
 
 **Small files that open anywhere**
@@ -43,11 +43,11 @@ Also: keyboard shortcuts, screen reader support, light and dark mode, works offl
 |---|---|
 | Alt+R | Start recording, or start a new one |
 | Alt+P | Pause or resume |
-| Alt+M | Mute or unmute the microphone |
+| Alt+M | Turn the mic on or off |
 | Alt+K | Add a marker |
-| Alt+C | Show or hide the webcam bubble |
+| Alt+C | Turn the camera on or off |
 | Alt+S | Stop |
-| Escape | Close the open panel (Settings, Trim, Markers) |
+| Escape | Close the open panel (Recording options, Trim, Markers) |
 
 ## Running it locally
 
@@ -71,4 +71,6 @@ Then open http://localhost:8000.
 
 ## Browser support
 
-Recent desktop versions of Chrome, Edge, Firefox, and Safari. Multiple sources, setting them up before recording, the webcam bubble, switching sources, floating controls, and recording straight to a chosen file need Chrome or Edge. Firefox records WebM only.
+Recent desktop versions of Chrome, Edge, Firefox, and Safari. Everything above works in all of them, except: sharing a tab's sound (and so **Add sound**), floating controls, and recording straight to a chosen file need Chrome or Edge, and Firefox records WebM only.
+
+Chrome and Edge combine what you share by handing each frame straight to the recording. Firefox and Safari draw it onto a canvas that's recorded instead, redrawn on a timer that keeps running in background tabs.

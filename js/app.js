@@ -3,20 +3,19 @@
 // ---------- Elements ----------
 const $ = (id) => document.getElementById(id);
 const els = {
-  stage: $('stage'), stageEmpty: $('stageEmpty'), stageTitle: $('stageTitle'), stageText: $('stageText'), video: $('video'),
+  stage: $('stage'), stageEmpty: $('stageEmpty'), stageNotice: $('stageNotice'), stageTitle: $('stageTitle'), stageText: $('stageText'), video: $('video'),
   installBtn: $('installBtn'),
-  setupView: $('setupView'), startBtn: $('startBtn'), startHint: $('startHint'), micOn: $('micOn'), modeSwitch: $('modeSwitch'),
+  setupView: $('setupView'), startBtn: $('startBtn'), startHint: $('startHint'), modeSwitch: $('modeSwitch'),
+  setupTools: $('setupTools'), avTools: $('avTools'), micOn: $('micOn'), camOn: $('camOn'), cameraTool: $('cameraTool'), tabAudioTool: $('tabAudioTool'),
   sourcesPanel: $('sourcesPanel'), sourceList: $('sourceList'),
   addSourceBtn: $('addSourceBtn'), addSourceLabel: $('addSourceLabel'),
   layoutSelect: $('layoutSelect'), swapBtn: $('swapBtn'), layoutDescription: $('layoutDescription'),
   balanceRow: $('balanceRow'), balanceRange: $('balanceRange'), balanceOut: $('balanceOut'), previewBtn: $('previewBtn'),
   addSoundBtn: $('addSoundBtn'), soundList: $('soundList'),
-  cameraManageBtn: $('cameraManageBtn'), cameraManageLabel: $('cameraManageLabel'), liveCorner: $('liveCorner'),
+  liveCorner: $('liveCorner'), cornerDivider: $('cornerDivider'),
   liveSlot: $('liveSlot'), liveControls: $('liveControls'), recPill: $('recPill'), recLabel: $('recLabel'), timer: $('timer'), liveNotes: $('liveNotes'),
   pauseBtn: $('pauseBtn'), pauseLabel: $('pauseLabel'), pauseIcon: $('pauseIcon'), resumeIcon: $('resumeIcon'),
-  muteBtn: $('muteBtn'), muteLabel: $('muteLabel'), micOnIcon: $('micOnIcon'), micOffIcon: $('micOffIcon'),
-  cameraBtn: $('cameraBtn'), cameraLabel: $('cameraLabel'), markerBtn: $('markerBtn'),
-  switchBtn: $('switchBtn'), popoutBtn: $('popoutBtn'), stopBtn: $('stopBtn'),
+  markerBtn: $('markerBtn'), popoutBtn: $('popoutBtn'), stopBtn: $('stopBtn'),
   levels: $('levels'), micLevel: $('micLevel'), tabLevel: $('tabLevel'), micMeterFill: $('micMeterFill'), tabMeterFill: $('tabMeterFill'),
   micVolume: $('micVolume'), tabVolume: $('tabVolume'), micVolumeOut: $('micVolumeOut'), tabVolumeOut: $('tabVolumeOut'),
   pipNote: $('pipNote'), pipReturnBtn: $('pipReturnBtn'),
@@ -27,12 +26,12 @@ const els = {
   markersPanel: $('markersPanel'), markersSummary: $('markersSummary'), markerList: $('markerList'), markersEmpty: $('markersEmpty'),
   addMarkerHereBtn: $('addMarkerHereBtn'), copyChaptersBtn: $('copyChaptersBtn'),
   settings: $('settings'), settingsBody: $('settingsBody'), settingsSummary: $('settingsSummary'),
-  micSelect: $('micSelect'), micHint: $('micHint'), micAccessBtn: $('micAccessBtn'), micProcessing: $('micProcessing'),
+  micSelect: $('micSelect'), micProcessing: $('micProcessing'),
   noiseSuppression: $('noiseSuppression'), echoCancellation: $('echoCancellation'), leveling: $('leveling'), systemAudio: $('systemAudio'),
   recordModeInputs: [...document.querySelectorAll('input[name="recordMode"]')],
   qualityField: $('qualityField'), qualitySelect: $('qualitySelect'), qualityHint: $('qualityHint'),
   formatSelect: $('formatSelect'), formatHint: $('formatHint'),
-  cameraField: $('cameraField'), cameraSelect: $('cameraSelect'), cameraCorner: $('cameraCorner'), cameraHint: $('cameraHint'), cameraAccessBtn: $('cameraAccessBtn'),
+  cameraSelect: $('cameraSelect'),
   autoStopSelect: $('autoStopSelect'),
   savingGroup: $('savingGroup'), storageHint: $('storageHint'),
   saveModeBrowserLabel: $('saveModeBrowserLabel'), saveModeFileLabel: $('saveModeFileLabel'), saveModeMemoryLabel: $('saveModeMemoryLabel'),
@@ -45,10 +44,14 @@ const els = {
 
 // ---------- Capabilities ----------
 const canRecord = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia && window.MediaRecorder);
-// Insertable streams (Chromium) give MediaRecorder one video track that never changes while we
-// feed it frames. That's what makes switching sources and the webcam bubble possible.
-const canComposite = 'MediaStreamTrackGenerator' in window && 'MediaStreamTrackProcessor' in window && 'OffscreenCanvas' in window;
-const canSwitch = canComposite;
+// The compositor gives MediaRecorder one video track that never changes, which is what lets
+// sources and the camera come and go. Chrome and Edge feed it frames directly (insertable
+// streams); other browsers record a canvas.
+const canInsertable = 'MediaStreamTrackGenerator' in window && 'MediaStreamTrackProcessor' in window && 'OffscreenCanvas' in window;
+const canComposite = canInsertable || (typeof HTMLCanvasElement !== 'undefined' && 'captureStream' in HTMLCanvasElement.prototype);
+// Only Chromium browsers can share a tab's (or the system's) sound. Pages can't ask without
+// opening the picker, so this goes by browser.
+const canTabAudio = !!navigator.userAgentData;
 const canPip = 'documentPictureInPicture' in window;
 const canSaveToDisk = 'showSaveFilePicker' in window;
 const isMac = /mac/i.test((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '');
@@ -155,27 +158,26 @@ function announce(message, tone = 'info') {
 }
 
 // ---------- Settings ----------
-let cameraWanted = false; // remembered camera on/off, used until a session is running
 function radioValue(inputs) { const c = inputs.find((i) => i.checked); return c ? c.value : null; }
 function readSettings() {
   return {
-    // On or off is chosen on the main screen; Settings only picks which device.
+    // The mic and camera toggles turn them on and off; their menus pick the device.
     micOn: els.micOn.checked,
     micDevice: els.micSelect.value || 'default',
     micId: els.micOn.checked ? (els.micSelect.value || 'default') : 'none',
     noiseSuppression: els.noiseSuppression.checked,
     echoCancellation: els.echoCancellation.checked,
     leveling: els.leveling.checked,
-    // In audio-only recordings where sound can be added (Chrome and Edge), Add sound replaces this toggle.
+    // Sound from shared tabs (Chrome and Edge). Audio-only recordings use Add sound instead.
     tabAudio: els.systemAudio.checked,
-    systemAudio: els.systemAudio.checked && !(canComposite && radioValue(els.recordModeInputs) === 'audio'),
+    systemAudio: els.systemAudio.checked && canTabAudio && radioValue(els.recordModeInputs) !== 'audio',
     recordMode: radioValue(els.recordModeInputs) || 'screen',
     quality: els.qualitySelect.value || 'standard',
     format: currentFormat(),
-    cameraOn: cameraWanted,
+    cameraOn: els.camOn.checked,
     cameraDevice: els.cameraSelect.value || 'default',
-    cameraId: cameraWanted ? (els.cameraSelect.value || 'default') : 'none',
-    cameraCorner: els.cameraCorner.value || 'br',
+    cameraId: els.camOn.checked ? (els.cameraSelect.value || 'default') : 'none',
+    cameraCorner: radioValue([...els.liveCorner.querySelectorAll('input')]) || 'br',
     autoStop: Number(els.autoStopSelect.value) || 0,
     saveMode: currentSaveMode(),
     micVolume: Number(els.micVolume.value),
@@ -220,12 +222,13 @@ function loadSettings() {
   }
   const tab = typeof s.tabAudio === 'boolean' ? s.tabAudio : s.systemAudio;
   if (typeof tab === 'boolean') els.systemAudio.checked = tab;
-  els.micOn.checked = typeof s.micOn === 'boolean' ? s.micOn : s.micId !== 'none';
-  cameraWanted = typeof s.cameraOn === 'boolean' ? s.cameraOn : !!(s.cameraId && s.cameraId !== 'none');
+  // Both start off, then remember what you last chose.
+  els.micOn.checked = typeof s.micOn === 'boolean' ? s.micOn : !!(s.micId && s.micId !== 'none');
+  els.camOn.checked = typeof s.cameraOn === 'boolean' ? s.cameraOn : !!(s.cameraId && s.cameraId !== 'none');
   if (s.recordMode) els.recordModeInputs.forEach((i) => { i.checked = i.value === s.recordMode; });
   if (PRESETS[s.quality]) els.qualitySelect.value = s.quality;
   if (s.autoStop != null) els.autoStopSelect.value = String(s.autoStop);
-  if (s.cameraCorner) { els.cameraCorner.value = s.cameraCorner; setRadioGroup(els.liveCorner, s.cameraCorner); }
+  if (s.cameraCorner) setRadioGroup(els.liveCorner, s.cameraCorner);
   for (const [key, el] of [['micVolume', els.micVolume], ['tabVolume', els.tabVolume]]) {
     if (typeof s[key] === 'number') el.value = String(s[key]);
   }
@@ -265,16 +268,9 @@ function updateSettingsUI() {
   const bps = preset.video * FORMATS[s.format].bitrate + preset.audio;
   els.qualityHint.textContent = `${preset.hint} Up to about ${formatBytes((bps / 8) * 3600)} per hour, often less.`;
 
-  // Camera: needs insertable streams, and only makes sense with video.
-  els.cameraField.hidden = !canComposite || audioOnly;
-  els.cameraCorner.disabled = s.cameraId === 'none';
-
-  const opt = els.micSelect.selectedOptions[0];
-  let mic = s.micDevice === 'default' ? 'Default mic' : (opt ? opt.textContent : 'Mic');
-  if (mic.length > 24) mic = mic.slice(0, 23) + '…';
   const what = audioOnly ? 'Audio only' : `${{ compact: 'Compact', standard: 'Standard', high: 'High' }[s.quality]} ${s.format === 'mp4' ? 'MP4' : s.format === 'av1' ? 'AV1' : 'WebM'}`;
   const saving = { browser: 'Saves as it records', file: 'Saves to a file' }[s.saveMode] || '';
-  els.settingsSummary.textContent = [what, s.micOn ? mic : '', saving]
+  els.settingsSummary.textContent = [what, saving]
     .filter(Boolean).join(' · ');
 }
 function updateVolumeOutputs() {
@@ -293,14 +289,14 @@ async function refreshDevices() {
   catch (err) { console.warn('Could not list devices', err); }
   const saved = store.get('settings', {});
   fillDeviceSelect(els.micSelect, devices.filter((d) => d.kind === 'audioinput'), {
-    wanted: els.micSelect.value || saved.micDevice || saved.micId || 'default', defaultLabel: 'Default microphone', hint: els.micHint,
+    wanted: els.micSelect.value || saved.micDevice || saved.micId || 'default', defaultLabel: 'Default microphone', askLabel: 'Show all microphones…',
   });
   fillDeviceSelect(els.cameraSelect, devices.filter((d) => d.kind === 'videoinput'), {
-    wanted: els.cameraSelect.value || saved.cameraDevice || saved.cameraId || 'default', defaultLabel: 'Default camera', hint: els.cameraHint,
+    wanted: els.cameraSelect.value || saved.cameraDevice || saved.cameraId || 'default', defaultLabel: 'Default camera', askLabel: 'Show all cameras…',
   });
   updateSettingsUI();
 }
-function fillDeviceSelect(select, devices, { wanted, defaultLabel, hint }) {
+function fillDeviceSelect(select, devices, { wanted, defaultLabel, askLabel }) {
   const hasLabels = devices.some((d) => d.label);
   const defaultDevice = devices.find((d) => d.deviceId === 'default');
   const defaultName = defaultDevice && defaultDevice.label ? defaultDevice.label.replace(/^Default\s*-\s*/i, '') : '';
@@ -311,9 +307,11 @@ function fillDeviceSelect(select, devices, { wanted, defaultLabel, hint }) {
       options.push([d.deviceId, d.label || defaultLabel]);
     }
   }
+  // Browsers only name devices once you've allowed access to one.
+  if (!hasLabels && devices.length) options.push(['ask', askLabel]);
   select.replaceChildren(...options.map(([value, text]) => new Option(text, value)));
-  select.value = options.some(([v]) => v === wanted) ? wanted : 'default';
-  hint.hidden = hasLabels || devices.length === 0;
+  select.value = options.some(([v]) => v === wanted && v !== 'ask') ? wanted : 'default';
+  select.dataset.value = select.value;
 }
 async function requestDeviceAccess(kind) {
   const isCam = kind === 'camera';
@@ -609,27 +607,6 @@ function createMixer(settings) {
   };
 }
 
-// Draws the webcam as a circle in a corner of the frame.
-function drawBubble(ctx, cam, w, h, corner) {
-  const short = Math.min(w, h);
-  const d = Math.round(short * 0.24), m = Math.round(short * 0.03);
-  const x = corner.includes('l') ? m : w - m - d;
-  const y = corner.includes('t') ? m : h - m - d;
-  const cw = cam.displayWidth, ch = cam.displayHeight, s = Math.min(cw, ch);
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(x + d / 2, y + d / 2, d / 2, 0, Math.PI * 2);
-  ctx.clip();
-  ctx.drawImage(cam, (cw - s) / 2, (ch - s) / 2, s, s, x, y, d, d);
-  ctx.restore();
-  ctx.beginPath();
-  const lw = Math.max(2, Math.round(d * 0.02));
-  ctx.arc(x + d / 2, y + d / 2, d / 2 - lw / 2, 0, Math.PI * 2);
-  ctx.lineWidth = lw;
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-  ctx.stroke();
-}
-
 // ---------- Layout ----------
 // Fits one or two sources into a W×H frame. Two sources are drawn at the same scale, so text in
 // both shrinks by the same amount, and as large as they'll go. "Automatic" picks side by side or
@@ -669,153 +646,263 @@ function computeLayout(sizes, W, H, mode, ratio = 1) {
 }
 
 // ---------- Compositor ----------
-// Draws up to two sources and the webcam bubble into one frame and gives MediaRecorder a single
-// video track that never changes, whatever happens to the sources behind it. The frame keeps a
-// fixed 16:9 size: MP4's H.264 can't change resolution part way through, and a fixed frame lets
+// Draws up to two sources and the camera into one frame and gives MediaRecorder a single video
+// track that never changes, whatever happens to the sources behind it. The frame keeps a fixed
+// 16:9 size: MP4's H.264 can't change resolution part way through, and a fixed frame lets
 // sources and the camera come and go during a recording.
-function createCompositor({ width, height, corner, onLayout }) {
+//
+// The drawing is the same in every browser; only how frames come in and go out differs:
+// - Chrome and Edge (insertable streams): each source's frames arrive as they're captured and
+//   finished frames go straight to the recording, so background tabs don't slow it down and
+//   nothing is copied through hidden video players.
+// - Firefox and Safari: hidden video players feed a canvas whose stream is recorded, redrawn on a
+//   timer that runs in a worker, because timers on the page itself slow down in background tabs.
+function imageSize(img) {
+  return img.displayWidth ? { w: img.displayWidth, h: img.displayHeight } : { w: img.videoWidth, h: img.videoHeight };
+}
+
+// Draws the camera as a circle in a corner of the frame.
+function drawBubble(ctx, cam, w, h, corner) {
+  const short = Math.min(w, h);
+  const d = Math.round(short * 0.24), m = Math.round(short * 0.03);
+  const x = corner.includes('l') ? m : w - m - d;
+  const y = corner.includes('t') ? m : h - m - d;
+  const { w: cw, h: ch } = imageSize(cam);
+  const s = Math.min(cw, ch);
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x + d / 2, y + d / 2, d / 2, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.drawImage(cam, (cw - s) / 2, (ch - s) / 2, s, s, x, y, d, d);
+  ctx.restore();
+  ctx.beginPath();
+  const lw = Math.max(2, Math.round(d * 0.02));
+  ctx.arc(x + d / 2, y + d / 2, d / 2 - lw / 2, 0, Math.PI * 2);
+  ctx.lineWidth = lw;
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+  ctx.stroke();
+}
+
+// A timer that keeps its pace in background tabs (it runs in a worker).
+function createWorkerTimer(ms, onTick) {
+  const code = 'let t; onmessage = (e) => { clearInterval(t); if (e.data > 0) t = setInterval(() => postMessage(0), e.data); };';
+  try {
+    const url = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
+    const worker = new Worker(url);
+    URL.revokeObjectURL(url);
+    worker.onmessage = onTick;
+    worker.postMessage(ms);
+    return () => worker.terminate();
+  } catch {
+    const t = setInterval(onTick, ms);
+    return () => clearInterval(t);
+  }
+}
+
+// Frames in and out for Chrome and Edge.
+function createFramePump() {
   const generator = new MediaStreamTrackGenerator({ kind: 'video' });
-  generator.contentHint = 'detail'; // favour sharp text over smooth motion
   const writer = generator.writable.getWriter();
-  const canvas = new OffscreenCanvas(Math.max(2, width & ~1), Math.max(2, height & ~1));
+  return {
+    track: generator,
+    canvas: (w, h) => new OffscreenCanvas(w, h),
+    // Calls onFrame with each new frame (a VideoFrame) until stop() is called or the track ends.
+    watch(track, onFrame, onEnd) {
+      const reader = new MediaStreamTrackProcessor({ track }).readable.getReader();
+      let live = true;
+      (async () => {
+        try {
+          for (;;) {
+            const { value: frame, done } = await reader.read();
+            if (done) break;
+            if (!live) { frame.close(); break; }
+            onFrame(frame);
+          }
+        } catch (err) {
+          console.warn('A source stopped', err);
+        } finally {
+          reader.cancel().catch(() => {});
+          if (live && onEnd) onEnd();
+        }
+      })();
+      return () => { live = false; reader.cancel().catch(() => {}); };
+    },
+    release(img) { if (img) img.close(); },
+    ready(img) { return !!img; },
+    async write(canvas) {
+      const frame = new VideoFrame(canvas, { timestamp: Math.round(performance.now() * 1000) });
+      try { await writer.write(frame); } catch { frame.close(); }
+    },
+    stop() { writer.close().catch(() => {}); generator.stop(); },
+  };
+}
+
+// Frames in and out for Firefox and Safari.
+function createCanvasPump(fps) {
+  let output = null;
+  return {
+    get track() { return output; },
+    canvas(w, h) {
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      output = c.captureStream(fps).getVideoTracks()[0];
+      return c;
+    },
+    // A hidden video player stands in for the frames: it always shows the latest one.
+    watch(track, onFrame, onEnd) {
+      const v = document.createElement('video');
+      v.muted = true;
+      v.playsInline = true;
+      v.srcObject = new MediaStream([track]);
+      v.play().catch(() => {});
+      const ready = () => onFrame(v);
+      v.addEventListener('loadeddata', ready, { once: true });
+      const ended = () => { if (onEnd) onEnd(); };
+      track.addEventListener('ended', ended);
+      return () => { track.removeEventListener('ended', ended); v.pause(); v.srcObject = null; };
+    },
+    release() {},
+    ready(img) { return !!img && img.videoWidth > 0; },
+    write() {},
+    stop() { if (output) output.stop(); },
+  };
+}
+
+function createCompositor({ width, height, corner, fps, onLayout }) {
+  const fast = canInsertable;
+  const pump = fast ? createFramePump() : createCanvasPump(fps);
+  const canvas = pump.canvas(Math.max(2, width & ~1), Math.max(2, height & ~1));
   const ctx = canvas.getContext('2d', { alpha: false });
+  const track = pump.track;
+  track.contentHint = 'detail'; // favour sharp text over smooth motion
   let W = canvas.width, H = canvas.height;
-  const slots = []; // { id, track, latest, token }
-  let camera = null; // { track, visible, alive, token }
+  const slots = []; // { id, img, unwatch }
+  let camera = null; // { img, unwatch }
   let layoutMode = 'auto', balance = 1;
   let stopped = false, writing = false, pending = false;
-  let lastLayout = null, lastKey = '', lastEmit = 0;
-  // Keep a frame coming at least every second, even with nothing on screen to draw.
-  const idle = setInterval(() => { if (!stopped && performance.now() - lastEmit > 900) emit(null); }, 500);
+  let lastLayout = null, lastKey = '', lastDraw = 0;
 
-  function draw(camFrame) {
-    const live = slots.filter((s) => s.latest);
+  function draw() {
+    const live = slots.filter((s) => pump.ready(s.img));
+    const cam = camera && pump.ready(camera.img) ? camera.img : null;
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, W, H);
     if (!live.length) {
       // Nothing shared: the camera fills the frame (cropped to fit), or the frame stays black.
-      if (camFrame && camera && camera.visible) {
-        const cw = camFrame.displayWidth, ch = camFrame.displayHeight;
+      if (cam) {
+        const { w: cw, h: ch } = imageSize(cam);
         const sc = Math.max(W / cw, H / ch);
         const sw = W / sc, sh = H / sc;
-        ctx.drawImage(camFrame, (cw - sw) / 2, (ch - sh) / 2, sw, sh, 0, 0, W, H);
+        ctx.drawImage(cam, (cw - sw) / 2, (ch - sh) / 2, sw, sh, 0, 0, W, H);
       }
       lastLayout = { mode: camera ? 'camera' : 'empty', scale: 1, rects: [], ids: [], sizes: [], width: W, height: H, requested: layoutMode };
-      const key = `${lastLayout.mode}|${W}x${H}`;
-      if (key !== lastKey) { lastKey = key; if (onLayout) queueMicrotask(() => onLayout(lastLayout)); }
-      lastEmit = performance.now();
-      return new VideoFrame(canvas, { timestamp: Math.round(performance.now() * 1000) });
+    } else {
+      const sizes = live.map((s) => imageSize(s.img));
+      const layout = computeLayout(sizes, W, H, layoutMode, balance);
+      live.forEach((s, i) => { const r = layout.rects[i]; ctx.drawImage(s.img, r.x, r.y, r.w, r.h); });
+      if (cam) drawBubble(ctx, cam, W, H, corner);
+      lastLayout = { ...layout, ids: live.map((s) => s.id), sizes, width: W, height: H, requested: layoutMode };
     }
-    const sizes = live.map((s) => ({ w: s.latest.displayWidth, h: s.latest.displayHeight }));
-    const layout = computeLayout(sizes, W, H, layoutMode, balance);
-    live.forEach((s, i) => { const r = layout.rects[i]; ctx.drawImage(s.latest, r.x, r.y, r.w, r.h); });
-    if (camFrame && camera && camera.visible) drawBubble(ctx, camFrame, W, H, corner);
-    lastLayout = { ...layout, ids: live.map((s) => s.id), sizes, width: W, height: H, requested: layoutMode };
     // Tell the page when the arrangement changes (not on every frame).
-    const key = `${layoutMode}|${balance}|${lastLayout.mode}|${lastLayout.ids.join(',')}|${sizes.map((z) => `${Math.round(z.w / 8)}x${Math.round(z.h / 8)}`).join(',')}`;
+    const key = `${layoutMode}|${balance}|${lastLayout.mode}|${lastLayout.ids.join(',')}|${lastLayout.sizes.map((z) => `${Math.round(z.w / 8)}x${Math.round(z.h / 8)}`).join(',')}|${W}x${H}`;
     if (key !== lastKey) { lastKey = key; if (onLayout) queueMicrotask(() => onLayout(lastLayout)); }
-    // Composited frames get their own steady clock, since screen and camera timestamps differ.
-    lastEmit = performance.now();
-    return new VideoFrame(canvas, { timestamp: Math.round(performance.now() * 1000) });
+    lastDraw = performance.now();
   }
-  async function emit(camFrame) {
+  // Chrome and Edge: draw when a new frame arrives and send it to the recording. Composited
+  // frames get their own steady clock, since screen and camera timestamps differ.
+  async function emit() {
     if (stopped) return;
     if (writing) { pending = true; return; } // the encoder is busy; draw again when it's free
-    const frame = draw(camFrame);
-    if (!frame) return;
+    draw();
     writing = true;
-    try { await writer.write(frame); } catch { frame.close(); } finally { writing = false; }
-    if (pending && !stopped && !(camera && camera.alive)) { pending = false; emit(null); }
+    await pump.write(canvas);
+    writing = false;
+    if (pending && !stopped) { pending = false; emit(); }
   }
-  // With a camera, its frames drive the output; otherwise each new screen frame does.
-  function redraw() { if (!(camera && camera.alive)) emit(null); }
+  // With a camera, its frames set the pace; otherwise each new screen frame does.
+  function changed(fromCamera) {
+    if (!fast) return; // the timer below redraws
+    if (fromCamera || !(camera && camera.img)) emit();
+  }
+  // Keep frames coming when nothing changes, such as an empty frame or a still screen: at least
+  // five a second (Chrome and Edge, where sparser frames hold up saving as you record), or at the
+  // frame rate (other browsers).
+  const stopTimer = fast
+    ? createWorkerTimer(100, () => { if (!stopped && performance.now() - lastDraw > 190) emit(); })
+    : createWorkerTimer(Math.round(1000 / fps), () => { if (!stopped) draw(); });
 
-  async function pumpSlot(slot, track, token) {
-    const reader = new MediaStreamTrackProcessor({ track }).readable.getReader();
-    try {
-      for (;;) {
-        const { value: frame, done } = await reader.read();
-        if (done) break;
-        if (slot.token !== token || stopped) { frame.close(); break; }
-        if (slot.latest) slot.latest.close();
-        slot.latest = frame;
-        redraw();
-      }
-    } catch (err) {
-      console.warn('Source stopped', err);
-    } finally {
-      reader.cancel().catch(() => {});
-    }
-  }
-  async function pumpCamera(cam) {
-    const reader = new MediaStreamTrackProcessor({ track: cam.track }).readable.getReader();
-    try {
-      for (;;) {
-        const { value: frame, done } = await reader.read();
-        if (done || stopped || camera !== cam) { if (frame) frame.close(); break; }
-        await emit(frame);
-        frame.close();
-      }
-    } catch (err) {
-      console.warn('Camera stopped', err);
-    } finally {
-      cam.alive = false;
-      reader.cancel().catch(() => {});
-      redraw();
-    }
+  function watchSlot(slot, t) {
+    slot.unwatch = pump.watch(t, (img) => {
+      if (stopped || !slots.includes(slot)) { pump.release(img); return; }
+      if (slot.img !== img) pump.release(slot.img);
+      slot.img = img;
+      changed(false);
+    });
   }
 
   return {
-    track: generator,
-    addSource(id, track) {
-      const slot = { id, track, latest: null, token: 1 };
+    track,
+    addSource(id, t) {
+      const slot = { id, img: null, unwatch: null };
       slots.push(slot);
-      pumpSlot(slot, track, slot.token);
+      watchSlot(slot, t);
     },
     // Keeps showing the old picture until the new source's first frame arrives.
-    replaceSource(id, track) {
+    replaceSource(id, t) {
       const slot = slots.find((s) => s.id === id);
       if (!slot) return;
-      slot.token += 1;
-      slot.track = track;
-      pumpSlot(slot, track, slot.token);
+      if (slot.unwatch) slot.unwatch();
+      watchSlot(slot, t);
     },
     removeSource(id) {
       const i = slots.findIndex((s) => s.id === id);
       if (i < 0) return;
       const [slot] = slots.splice(i, 1);
-      slot.token += 1;
-      if (slot.latest) slot.latest.close();
-      redraw();
+      if (slot.unwatch) slot.unwatch();
+      pump.release(slot.img);
+      slot.img = null;
+      changed(false);
     },
-    swap() { slots.reverse(); redraw(); },
+    swap() { slots.reverse(); changed(false); },
     // Only before recording: H.264 can't change size part way through.
-    resize(width, height) {
-      const w = Math.max(2, width & ~1), h = Math.max(2, height & ~1);
+    resize(w, h) {
+      w = Math.max(2, w & ~1); h = Math.max(2, h & ~1);
       if (w === W && h === H) return;
       canvas.width = W = w;
       canvas.height = H = h;
       lastKey = '';
-      redraw();
+      changed(false);
     },
-    setLayout(mode) { layoutMode = mode; redraw(); },
+    setLayout(mode) { layoutMode = mode; changed(false); },
     get layoutMode() { return layoutMode; },
-    setBalance(r) { balance = r; redraw(); },
+    setBalance(r) { balance = r; changed(false); },
     get balance() { return balance; },
-    setCamera(track) {
-      camera = track ? { track, visible: true, alive: true } : null;
-      if (camera) pumpCamera(camera); else redraw();
+    // Turning the camera on or off (or switching cameras); null removes it.
+    setCamera(t) {
+      const old = camera;
+      camera = null;
+      if (old) { if (old.unwatch) old.unwatch(); pump.release(old.img); }
+      if (t) {
+        const cam = { img: null, unwatch: null };
+        camera = cam;
+        cam.unwatch = pump.watch(t, (img) => {
+          if (stopped || camera !== cam) { pump.release(img); return; }
+          if (cam.img !== img) pump.release(cam.img);
+          cam.img = img;
+          changed(true);
+        });
+      }
+      changed(false);
     },
-    setCameraVisible(v) { if (camera) camera.visible = v; },
-    setCorner(c) { corner = c; },
+    setCorner(c) { corner = c; changed(false); },
     layoutInfo() { return lastLayout; },
     stop() {
       stopped = true;
-      clearInterval(idle);
+      stopTimer();
+      for (const s of [...slots, ...(camera ? [camera] : [])]) { if (s.unwatch) s.unwatch(); pump.release(s.img); s.img = null; }
       camera = null;
-      for (const s of slots) { s.token += 1; if (s.latest) { s.latest.close(); s.latest = null; } }
-      writer.close().catch(() => {});
-      generator.stop();
+      pump.stop();
     },
   };
 }
@@ -893,17 +980,11 @@ function watchSource(source) {
     if (!rec || switching || !rec.sources.includes(source)) return;
     const index = rec.sources.indexOf(source);
     const label = sourceLabel(index, source);
-    // Keep going if something's left to show: another source, or the camera (which then fills the frame).
-    const keep = rec.sources.length > 1 || (rec.compositor && (rec.camStream || (phase === 'arranging' && rec.sounds.length)));
-    if (keep) {
-      removeSourceNow(source);
-      announce(`${label} stopped sharing, so it was removed.${rec.sources.length ? '' : rec.camStream ? ' Your camera fills the frame.' : ''}${isLive() ? ' Recording continues.' : ''}`);
-    } else if (phase === 'arranging') {
-      cancelArrange(`${label} stopped sharing.`);
-    } else {
-      announce('Sharing ended, so the recording was stopped.');
-      stopRecording();
-    }
+    // The recording carries on whatever is left, even nothing; before recording, an empty
+    // main screen goes back to the start.
+    removeSourceNow(source);
+    if (phase === 'arranging' && sessionIsEmpty()) { cancelArrange(`${label} stopped sharing.`); return; }
+    announce(`${label} stopped sharing, so it was removed.${afterRemoval()}${isLive() ? ' Recording continues.' : ''}`);
   };
 }
 function removeSourceNow(source) {
@@ -915,19 +996,27 @@ function removeSourceNow(source) {
   render();
 }
 
-// Several sources at once needs Chrome or Edge, and doesn't apply to audio-only recordings.
+// What's shown once a source has gone.
+function afterRemoval() {
+  if (!rec || !rec.compositor || rec.sources.length) return '';
+  return rec.camStream ? ' Your camera fills the frame.' : ' Nothing is showing now.';
+}
+
+// Sources don't apply to audio-only recordings.
 function multiSourceMode() {
   if (rec) return !!rec.compositor;
   return canComposite && readSettings().recordMode !== 'audio';
 }
 
 async function addSource() {
-  if (!rec) { if (phase === 'setup' && multiSourceMode()) await shareFirstSource(); return; }
-  if (!rec.compositor || rec.sources.length >= 2 || switching) return;
+  if (switching) return;
+  if (!rec && !(phase === 'setup' && multiSourceMode() && ensureSession())) return;
+  if (!rec.compositor || rec.sources.length >= 2) return;
   let added = false;
+  const first = !rec.sources.length;
   switching = true;
   render();
-  announce('Choose a second window, tab, or screen. You’ll stay on this page.');
+  announce(`Choose a ${first ? '' : 'second '}window, tab, or screen. You’ll stay on this page${isLive() || first ? '' : ', and nothing is recorded yet'}.`);
   try {
     const s = await pickSource(rec.settings, { keepFocus: true });
     if (!rec) { stopStream(s.stream); return; }
@@ -937,7 +1026,9 @@ async function addSource() {
     watchSource(s);
     await layoutIncludes(s.id);
     renderSources(true);
-    announce(`Added ${sourceLabel(rec.sources.indexOf(s), s).replace(/^Source/, 'source')}. ${describeLayout()}`);
+    announce(first && phase === 'arranging'
+      ? `Sharing ${surfaceName(s)}. Nothing is recorded until you press Record. ${describeLayout()}`
+      : `Added ${sourceLabel(rec.sources.indexOf(s), s).replace(/^Source/, 'source')}. ${describeLayout()}`);
     added = true;
   } catch (err) {
     announce(err.name === 'NotAllowedError' ? 'No source was added.' : `Couldn’t add a source: ${err.message || err.name}`,
@@ -945,6 +1036,8 @@ async function addSource() {
   } finally {
     switching = false;
     render();
+    renderSources(true);
+    if (phase === 'arranging' && sessionIsEmpty()) cancelArrange('', { quiet: true });
     // The add button hides once there are two sources, so move on to what comes next.
     if (added && document.activeElement === els.addSourceBtn || (added && document.activeElement === document.body)) {
       (phase === 'arranging' ? els.startBtn : els.layoutSelect.querySelector('input:checked')).focus();
@@ -984,22 +1077,10 @@ async function replaceSource(source) {
 function removeSource(source) {
   if (!rec || !rec.sources.includes(source)) return;
   const label = sourceLabel(rec.sources.indexOf(source), source);
-  if (rec.sources.length < 2) {
-    if (rec.compositor && (rec.camStream || (phase === 'arranging' && rec.sounds.length))) {
-      // The camera (or just the sound) carries on without it.
-      removeSourceNow(source);
-      announce(`${label} removed.${rec.camStream ? ' Your camera fills the frame.' : ''}`);
-      els.addSourceBtn.focus();
-      return;
-    }
-    // Before recording, removing the only source goes back to an empty main screen.
-    if (phase !== 'arranging') return;
-    cancelArrange(`${label} removed. Nothing is shared now.`, { quiet: true });
-    els.addSourceBtn.focus();
-    return;
-  }
   removeSourceNow(source);
-  announce(`${label} removed. ${describeLayout()}`);
+  // Before recording, removing the last thing goes back to an empty main screen.
+  if (phase === 'arranging' && sessionIsEmpty()) cancelArrange(`${label} removed. Nothing is shared now.`, { quiet: true });
+  else announce(`${label} removed.${rec.sources.length ? ' ' + describeLayout() : afterRemoval()}`);
   els.addSourceBtn.focus();
 }
 
@@ -1087,64 +1168,171 @@ function layoutIncludes(id) {
   });
 }
 
-// --- Camera, while arranging or recording ---
-async function addCamera() {
-  if (!rec || !rec.compositor || rec.camStream || switching) return;
-  switching = true;
+// --- The camera and mic, on the main screen and while recording ---
+// The camera toggle really turns the camera (and its light) on and off, like in a video call.
+// With nothing else shared, the camera fills the frame; with a source, it's a circle in a corner.
+let cameraBusy = false, micBusy = false;
+function cameraAllowed() { return canComposite && (rec ? !!rec.compositor : readSettings().recordMode !== 'audio'); }
+async function setCameraOn(on, { say = false } = {}) {
+  els.camOn.checked = on;
+  saveSettings();
+  if (!cameraAllowed() || phase === 'stopping') { render(); return; }
+  if (on) {
+    // Turning it on from an empty main screen starts setting up, with the camera as the preview.
+    if (!rec && !ensureSession({ openCam: false })) return;
+    await openCamera();
+  } else if (rec && rec.camStream) {
+    closeCamera();
+  } else if (say) {
+    announce('Camera off.');
+  }
+  render();
+}
+async function openCamera({ quiet = false } = {}) {
+  if (!rec || !rec.compositor || rec.camStream || cameraBusy) return;
+  const session = rec;
+  cameraBusy = true;
   render();
   try {
-    const s = { ...rec.settings, cameraId: els.cameraSelect.value || 'default' };
-    const cam = await getCamera(s);
-    if (!rec) { stopStream(cam); return; }
+    const cam = await getCamera({ cameraId: els.cameraSelect.value || 'default' });
+    if (rec !== session || !els.camOn.checked) { stopStream(cam); return; }
     attachCamera(cam);
-    refreshDevices();
-    if (!cameraWanted) { cameraWanted = true; saveSettings(); }
-    announce(rec.sources.length ? `Camera added in the ${cornerName(rec.corner)} corner.` : 'Camera on. It fills the frame until you add a screen, window, or tab.');
+    refreshDevices(); // names become available once access is allowed
+    if (!quiet) announce(rec.sources.length ? `Camera on, in the ${cornerName(rec.corner)} corner.` : 'Camera on. It fills the frame.');
   } catch (err) {
+    els.camOn.checked = false;
+    saveSettings();
     announce(err.name === 'NotAllowedError' ? 'Camera access was blocked.' : `Couldn’t open the camera: ${err.message || err.name}`, 'error');
   } finally {
-    switching = false;
+    cameraBusy = false;
     render();
     renderSources();
     if (phase === 'arranging' && sessionIsEmpty()) cancelArrange('', { quiet: true });
   }
 }
+// Shows a camera stream, replacing (and turning off) the one before it, if any.
 function attachCamera(cam) {
+  const old = rec.camStream;
   rec.camStream = cam;
-  rec.cameraVisible = true;
   rec.compositor.setCamera(cam.getVideoTracks()[0]);
+  if (old) stopStream(old);
   cam.getVideoTracks()[0].onended = () => {
     if (!rec || rec.camStream !== cam) return;
     rec.camStream = null;
     rec.compositor.setCamera(null);
+    els.camOn.checked = false;
     render();
     renderSources();
     announce('The camera was disconnected.', 'warn');
+    if (phase === 'arranging' && sessionIsEmpty()) cancelArrange('', { quiet: true });
   };
 }
-function removeCamera() {
-  if (!rec || !rec.camStream) return;
+function closeCamera() {
   const cam = rec.camStream;
   rec.camStream = null;
   rec.compositor.setCamera(null);
   stopStream(cam); // turns the camera (and its light) off
-  if (cameraWanted) { cameraWanted = false; saveSettings(); }
-  if (phase === 'arranging' && sessionIsEmpty()) cancelArrange('Camera off.', { quiet: true });
-  else announce('Camera removed and turned off.');
-  render();
   renderSources();
-  els.cameraManageBtn.focus();
+  if (phase === 'arranging' && sessionIsEmpty()) cancelArrange('Camera off.', { quiet: true });
+  else announce(rec.sources.length ? 'Camera off.' : 'Camera off. Nothing is showing now.');
 }
-function toggleCamera() {
-  if (!rec || !rec.camStream || !rec.compositor) return;
-  rec.cameraVisible = !rec.cameraVisible;
-  rec.compositor.setCameraVisible(rec.cameraVisible);
+
+// The mic toggle: before recording it's just remembered; while recording it opens or closes
+// the microphone, so it can come and go (and its indicator turns off with it).
+async function setMicOn(on, { say = false } = {}) {
+  els.micOn.checked = on;
+  saveSettings();
   render();
-  announce(rec.cameraVisible ? 'Camera shown.' : 'Camera hidden. It’s still on, so you can show it again right away.');
+  if (rec && isLive() && phase !== 'stopping') {
+    if (on && !rec.micStream) {
+      const ok = await openMic(rec);
+      if (ok && say) announce('Mic on.');
+    } else if (!on && rec.micStream) {
+      closeMic(rec);
+      if (say) announce('Mic off.');
+    }
+  } else if (say) {
+    announce(on ? 'Mic on.' : 'Mic off.');
+  }
+}
+// Opens the chosen microphone and feeds it into the mix. Returns true if it worked.
+async function openMic(session, warnings = null) {
+  if (micBusy) return false;
+  micBusy = true;
+  try {
+    const mic = await getMic({ ...session.settings, micId: els.micSelect.value || 'default' });
+    if (rec !== session) { stopStream(mic.stream); return false; }
+    const old = session.micStream;
+    session.micStream = mic.stream;
+    if (session.mixer) session.mixer.setMic(mic.stream);
+    stopStream(old);
+    if (mic.fellBack) {
+      const note = 'The chosen microphone wasn’t available, so the default one is being used.';
+      if (warnings) warnings.push(note); else announce(note, 'warn');
+    }
+    mic.stream.getAudioTracks()[0].onended = () => {
+      if (session.micStream !== mic.stream) return;
+      if (session.mixer) session.mixer.setMic(null);
+      session.micStream = null;
+      els.micOn.checked = false;
+      render();
+      announce('The microphone was disconnected.', 'warn');
+    };
+    refreshDevices();
+    return true;
+  } catch (err) {
+    console.warn('Microphone failed', err);
+    const note = err.name === 'NotAllowedError'
+      ? 'Microphone access was blocked, so it isn’t being recorded.'
+      : 'No microphone could be opened, so it isn’t being recorded.';
+    els.micOn.checked = false;
+    if (warnings) warnings.push(note); else announce(note, 'error');
+    return false;
+  } finally {
+    micBusy = false;
+    render();
+  }
+}
+function closeMic(session) {
+  if (session.mixer) session.mixer.setMic(null);
+  stopStream(session.micStream);
+  session.micStream = null;
+  render();
+}
+
+// Choosing a different mic or camera from its menu switches straight away if it's in use.
+async function onDeviceChoice(kind) {
+  const select = kind === 'camera' ? els.cameraSelect : els.micSelect;
+  if (select.value === 'ask') {
+    select.value = select.dataset.value || 'default';
+    requestDeviceAccess(kind);
+    return;
+  }
+  select.dataset.value = select.value;
+  saveSettings();
+  const name = select.selectedOptions[0] ? select.selectedOptions[0].textContent : '';
+  if (kind === 'camera' && rec && rec.camStream && !cameraBusy) {
+    const session = rec;
+    cameraBusy = true;
+    try {
+      const cam = await getCamera({ cameraId: select.value });
+      if (rec !== session || !rec.camStream) { stopStream(cam); return; }
+      attachCamera(cam);
+      announce(`Switched to ${name}.`);
+    } catch (err) {
+      announce(`Couldn’t switch cameras: ${err.message || err.name}`, 'error');
+    } finally {
+      cameraBusy = false;
+      render();
+    }
+  } else if (kind === 'mic' && rec && rec.micStream) {
+    if (await openMic(rec)) announce(`Switched to ${name}.`);
+  }
 }
 function cornerName(c) { return { br: 'bottom right', bl: 'bottom left', tr: 'top right', tl: 'top left' }[c] || 'bottom right'; }
 function setCameraCorner(c) {
-  if (!rec || !rec.compositor) { els.cameraCorner.value = c; saveSettings(); return; }
+  saveSettings();
+  if (!rec || !rec.compositor) return;
   rec.corner = c;
   rec.compositor.setCorner(c);
   announce(`Camera moved to the ${cornerName(c)} corner.`);
@@ -1168,7 +1356,6 @@ function renderSources(rebuild = false) {
   const has = !!(rec && rec.compositor);
   renderSounds();
   els.addSourceLabel.textContent = has ? 'Add source' : 'Add a screen, window, or tab';
-  els.cameraManageBtn.setAttribute('aria-pressed', String(has ? !!rec.camStream : readSettings().cameraId !== 'none'));
   if (!has) {
     els.sourceList.replaceChildren();
     els.sourceList.hidden = true;
@@ -1206,9 +1393,7 @@ function renderSources(rebuild = false) {
       const detail = document.createElement('span');
       detail.className = 'source-detail visually-hidden';
       li.append(name, small, detail, iconButton('i-replace', `Replace ${label}`, 'chip-btn', () => replaceSource(src)));
-      if (rec.sources.length > 1 || phase === 'arranging' || rec.camStream) {
-        li.append(iconButton('i-x', `Remove ${label}`, 'chip-btn is-danger', () => removeSource(src)));
-      }
+      li.append(iconButton('i-x', `Remove ${label}`, 'chip-btn is-danger', () => removeSource(src)));
       return li;
     }));
   }
@@ -1294,40 +1479,22 @@ function renderSounds() {
   els.soundList.hidden = !list.length;
 }
 
-// The camera button turns the camera on and off. With nothing else shared, it fills the frame.
-// The choice is remembered, so a recording started straight from Record includes it too.
-function onCameraButton() {
-  if (switching) return;
-  if (!rec && cameraWanted) {
-    // Remembered as on, but not running yet: turn it off.
-    cameraWanted = false;
-    saveSettings();
-    renderSources();
-    render();
-    announce('Camera off.');
-    return;
-  }
-  if (!ensureSession()) return;
-  if (rec.camStream) removeCamera(); else addCamera();
-}
-function onMicToggle() { saveSettings(); render(); }
-
 // ---------- Recording flow ----------
 // A session holds everything that's being captured; the recorder is added when recording starts.
 function createSession(settings, sources) {
   const audioOnly = settings.recordMode === 'audio';
   const session = {
     settings, audioOnly, sources, corner: settings.cameraCorner,
-    compositor: null, mixer: null, micStream: null, camStream: null, cameraVisible: false,
+    compositor: null, mixer: null, micStream: null, camStream: null,
     recorder: null, output: null, mimeType: '', filename: '',
-    chunks: [], markers: [], muted: false,
+    chunks: [], markers: [],
     elapsed: 0, segmentStart: 0, autoStopMs: settings.autoStop ? settings.autoStop * 60_000 : 0,
     timerId: 0, meterRaf: 0, warnings: [], arranged: false, sounds: [],
   };
   if (!audioOnly && canComposite) {
     const preset = PRESETS[settings.quality];
     session.compositor = createCompositor({
-      width: preset.width, height: preset.height, corner: session.corner,
+      width: preset.width, height: preset.height, fps: preset.fps, corner: session.corner,
       onLayout: () => { if (rec === session) renderSources(); },
     });
     session.compositor.setLayout(store.get('layout', 'auto'));
@@ -1394,88 +1561,10 @@ async function openFileOutputIfNeeded(settings, filename, warnings) {
   }
 }
 
-// Start with nothing shared yet: pick one source (or none, for audio only) and record.
-async function startRecording() {
-  if (phase !== 'setup' || !canRecord || switching || rec) return;
-  const settings = readSettings();
-  const audioOnly = settings.recordMode === 'audio';
-  if (audioOnly && settings.micId === 'none' && !settings.systemAudio) {
-    announce(canComposite ? 'Nothing to record. Turn on the mic or add sound.' : 'Nothing to record. Turn on the mic or tab audio.', 'error');
-    els.micOn.focus();
-    return;
-  }
-  if (!(await confirmReplacingRecovery()) || phase !== 'setup') return;
-  setPhase('starting');
-  const filename = recordingFilename(settings);
-  const warnings = [];
-  const file = await openFileOutputIfNeeded(settings, filename, warnings);
-  if (!file.ok) { setPhase('setup'); announce('Recording not started, because no save location was chosen.'); els.startBtn.focus(); return; }
-
-  const sources = [];
-  if (!audioOnly || settings.systemAudio) {
-    announce(audioOnly ? 'Choose a tab or screen to record its audio.' : 'Choose a screen, window, or tab to record.');
-    try {
-      sources.push(await pickSource(settings));
-    } catch (err) {
-      console.warn('getDisplayMedia failed', err);
-      discardOutput(file.output);
-      setPhase('setup');
-      if (err.name === 'NotAllowedError') announce('Selection was cancelled. Nothing was recorded.');
-      else if (err.name === 'NotFoundError') announce('No screen, window, or tab is available to record.', 'error');
-      else announce(`Couldn’t start capturing: ${err.message || err.name}`, 'error');
-      els.startBtn.focus();
-      return;
-    }
-  }
-  rec = createSession(settings, sources);
-  rec.filename = filename;
-  rec.output = file.output;
-  rec.warnings = warnings;
-  showPreview(rec);
-  startMeter();
-  await prepareRecording(rec);
-}
-
-// Sharing from the main screen: the first source starts a session that you can add a second
-// source and the camera to, with a live preview. Nothing is recorded until you start, and you
-// stay on this page (Chrome) instead of jumping to what you shared.
-async function shareFirstSource() {
-  if (phase !== 'setup' || rec || switching || !canComposite) return;
-  const settings = readSettings();
-  if (settings.recordMode === 'audio') return;
-  switching = true;
-  render();
-  announce('Choose a window, tab, or screen. You’ll stay on this page, and nothing is recorded yet.');
-  let first;
-  try {
-    first = await pickSource(settings, { keepFocus: true });
-  } catch (err) {
-    announce(err.name === 'NotAllowedError' ? 'Nothing was shared.' : `Couldn’t start capturing: ${err.message || err.name}`,
-      err.name === 'NotAllowedError' ? 'info' : 'error');
-    return;
-  } finally {
-    switching = false;
-    render();
-  }
-  if (phase !== 'setup' || rec) { stopStream(first.stream); return; }
-  rec = createSession(settings, [first]);
-  rec.arranged = true;
-  if (settings.cameraId !== 'none') {
-    try { attachCamera(await getCamera(settings)); } catch (err) { console.warn('Camera failed', err); }
-  }
-  showPreview(rec);
-  startMeter();
-  setPhase('arranging');
-  await layoutIncludes(first.id);
-  if (rec === null || phase !== 'arranging') return; // already started or cancelled
-  renderSources(true);
-  announce(`Sharing ${surfaceName(first)}. Add a second source or your camera if you like, then start recording.`);
-}
-
 // Starts an empty session on the main screen, so the camera or sound can come before any screen.
 // Screen recordings get a compositor; audio-only ones just mix sound (Chrome and Edge).
 function canArrange() { return canRecord && canComposite; }
-function ensureSession() {
+function ensureSession({ openCam = true } = {}) {
   if (rec) return !!(rec.compositor || rec.audioOnly);
   if (phase !== 'setup' || !canArrange()) return false;
   rec = createSession(readSettings(), []);
@@ -1483,6 +1572,7 @@ function ensureSession() {
   showPreview(rec);
   startMeter();
   setPhase('arranging');
+  if (openCam && rec.compositor && els.camOn.checked) openCamera({ quiet: true }); // remembered as on
   return true;
 }
 // Nothing left to show or hear before recording: back to the empty main screen.
@@ -1527,22 +1617,35 @@ function refreshSessionSettings(session) {
 
 async function startArranged() {
   if (phase !== 'arranging' || !rec || switching) return;
-  if (!(await confirmReplacingRecovery()) || phase !== 'arranging') return;
+  if (!(await confirmReplacingRecovery()) || phase !== 'arranging') {
+    if (phase === 'arranging' && sessionIsEmpty()) cancelArrange('', { quiet: true });
+    return;
+  }
   const session = rec;
+  if (!session) return;
   refreshSessionSettings(session);
   session.filename = recordingFilename(session.settings);
   setPhase('starting');
   const file = await openFileOutputIfNeeded(session.settings, session.filename, session.warnings);
-  if (!file.ok) { setPhase('arranging'); announce('Recording not started, because no save location was chosen.'); els.startBtn.focus(); return; }
+  if (!file.ok) {
+    setPhase('arranging');
+    if (sessionIsEmpty()) cancelArrange('', { quiet: true });
+    announce('Recording not started, because no save location was chosen.');
+    els.startBtn.focus();
+    return;
+  }
   session.output = file.output;
   await prepareRecording(session);
 }
 
-// The Start button and Alt+R: with sources already shared, record them; with nothing shared,
-// pick a source and record right away.
+// Record (and Alt+R) starts straight away with whatever is set up, even nothing: sources, the
+// camera, and sound can all be added while recording.
 function start() {
+  if (phase === 'setup' && !rec && !ensureSession()) {
+    if (!canComposite) announce('This browser can’t combine what you share into a recording. Try a recent Chrome, Edge, Firefox, or Safari.', 'error');
+    return undefined;
+  }
   if (phase === 'arranging') return startArranged();
-  if (phase === 'setup') return startRecording();
   return undefined;
 }
 
@@ -1562,30 +1665,13 @@ async function prepareRecording(session) {
       warnings.push('Couldn’t use browser storage, so the recording is kept in memory until you save it.');
     }
   }
-  if (settings.micId !== 'none') {
-    try {
-      const mic = await getMic(settings);
-      session.micStream = mic.stream;
-      if (mic.fellBack) warnings.push('The chosen microphone wasn’t available, so the default one is being used.');
-      if (session.mixer) session.mixer.setMic(mic.stream);
-      mic.stream.getAudioTracks()[0].onended = () => {
-        if (rec !== session) return;
-        if (session.mixer) session.mixer.setMic(null);
-        session.micStream = null;
-        render();
-        announce('The microphone was disconnected. Recording continues without it.', 'warn');
-      };
-    } catch (err) {
-      console.warn('Microphone failed', err);
-      warnings.push(err.name === 'NotAllowedError'
-        ? 'Microphone access was blocked, so it isn’t being recorded.'
-        : 'No microphone could be opened, so it isn’t being recorded.');
-    }
-  }
-  if (!session.arranged && session.compositor && settings.cameraId !== 'none' && !session.camStream) {
-    try { attachCamera(await getCamera(settings)); }
+  if (settings.micId !== 'none') await openMic(session, warnings);
+  // The camera was remembered as on but hasn't been opened yet (it may still be opening).
+  if (session.compositor && els.camOn.checked && !session.camStream && !cameraBusy) {
+    try { attachCamera(await getCamera({ cameraId: els.cameraSelect.value || 'default' })); }
     catch (err) {
       console.warn('Camera failed', err);
+      els.camOn.checked = false;
       warnings.push(err.name === 'NotAllowedError' ? 'Camera access was blocked, so the camera isn’t shown.' : 'The camera couldn’t be opened, so it isn’t shown.');
     }
   }
@@ -1606,17 +1692,10 @@ async function prepareRecording(session) {
     els.startBtn.focus();
   };
   if (rec !== session) { teardownCapture(session); discardOutput(session.output); return; }
-  if (first && first.track.readyState === 'ended' && session.sources.length === 1) return fail('Sharing ended before recording started.');
-  if (session.audioOnly && !session.micStream && ![...session.sources, ...session.sounds].some((s) => s.stream.getAudioTracks().length)) {
-    return fail(session.micStream === null && settings.micId === 'none'
-      ? 'Nothing to record. Turn on the mic or add sound.'
-      : 'There’s no audio to record: no microphone could be opened and nothing shared any sound.');
-  }
 
   const fmt = FORMATS[settings.format];
   const mimeType = supportedMime(settings.format, settings.recordMode);
-  const videoTrack = session.compositor ? session.compositor.track : (first ? first.track : null);
-  const tracks = session.audioOnly ? [session.mixer.track] : [videoTrack, ...(session.mixer ? [session.mixer.track] : [])];
+  const tracks = session.audioOnly ? [session.mixer.track] : [session.compositor.track, session.mixer.track];
   const preset = PRESETS[settings.quality];
   const options = { audioBitsPerSecond: preset.audio };
   if (mimeType) options.mimeType = mimeType;
@@ -1655,7 +1734,11 @@ function beginRecording() {
   tick();
   renderSources(true);
   const w = rec.warnings;
-  announce(['Recording started.', ...w].join(' '), w.length ? 'warn' : 'info');
+  // Recording with nothing to see (or hear) is fine, since things can be added as you go; say so once.
+  const notes = [];
+  if (rec.compositor && !rec.sources.length && !rec.camStream && !cameraBusy) notes.push('Nothing is showing yet: add a source or turn on your camera.');
+  if (rec.audioOnly && !rec.micStream && !rec.sounds.length) notes.push('Nothing is being heard yet: turn on the mic or add sound.');
+  announce(['Recording started.', ...w, ...notes].join(' '), w.length ? 'warn' : 'info');
   els.pauseBtn.focus();
 }
 
@@ -1698,14 +1781,6 @@ function togglePause() {
     announce('Recording resumed.');
   }
   tick();
-}
-
-function toggleMute() {
-  if (!rec || !rec.micStream) return;
-  rec.muted = !rec.muted;
-  rec.micStream.getAudioTracks().forEach((t) => { t.enabled = !rec.muted; });
-  render();
-  announce(rec.muted ? 'Microphone muted.' : 'Microphone on.');
 }
 
 function addMarker() {
@@ -1807,12 +1882,6 @@ async function finalizeRecording() {
     kind: 'recording', blob, container, mediaKind: session.audioOnly ? 'audio' : 'video', durationMs, filename,
     saved: onDisk, onDisk, storedName, markers: session.markers.map((m) => ({ ...m })),
   }, onDisk ? 'Saved to your computer' : 'Your recording is ready', message, warning ? 'warn' : 'info');
-}
-
-// Audio-only recordings of a tab can switch to a different tab.
-async function switchSource() {
-  if (!rec || !rec.sources[0] || !(phase === 'recording' || phase === 'paused')) return;
-  replaceSource(rec.sources[0]);
 }
 
 // ---------- The done view: playback, trim, markers, saving ----------
@@ -2346,7 +2415,7 @@ function render() {
   const arranging = phase === 'arranging' || (phase === 'starting' && arrangedFlow);
   const audioOnly = rec ? rec.audioOnly : (result ? result.mediaKind === 'audio' : readSettings().recordMode === 'audio');
 
-  // The main screen: share sources (Chrome and Edge), then start.
+  // The main screen: set up what to record, then start.
   const main = setup || arranging;
   const multi = canRecord && multiSourceMode();
   const shared = !!rec && arranging;
@@ -2354,24 +2423,34 @@ function render() {
   els.startBtn.disabled = !(phase === 'setup' || phase === 'arranging') || !canRecord || switching;
   // Only screen readers get this; sighted people can see what's shared.
   els.startHint.textContent = !canRecord ? ''
-    : shared ? 'Recording starts straight away.'
-    : audioOnly ? (canArrange() ? 'Records your microphone and any sound you add.' : 'Records your microphone and, if it’s on, a tab’s audio.')
-    : multi ? 'Nothing is shared yet, so this asks what to record, then starts straight away.'
-    : 'Asks what to record, then starts straight away.';
+    : audioOnly ? `Starts straight away. Records your microphone${canTabAudio ? ' and any sound you add' : ''}.`
+    : shared ? 'Starts straight away. You can change what’s shared while recording.'
+    : 'Starts straight away, even with nothing shared yet: you can add sources while recording.';
   els.modeSwitch.hidden = !canRecord || !!rec;
 
-  // Sources and camera (Chrome and Edge): on the main screen and while recording
+  // The mic and camera sit on the main screen before recording and with the recording controls after.
+  const avHost = live ? els.pauseBtn : null;
+  if (avHost ? els.avTools.previousElementSibling !== avHost : els.avTools.parentNode !== els.setupTools) {
+    if (avHost) avHost.after(els.avTools); else els.setupTools.prepend(els.avTools);
+  }
+  const avLocked = !(main || phase === 'recording' || phase === 'paused');
+  els.micOn.disabled = avLocked;
+  els.micSelect.disabled = avLocked;
+  els.cameraTool.hidden = !cameraAllowed();
+  els.camOn.disabled = avLocked || cameraBusy;
+  els.cameraSelect.disabled = avLocked || cameraBusy;
+  els.tabAudioTool.hidden = !canTabAudio || audioOnly;
+
+  // Sources, sound, and the camera's corner: on the main screen and while recording
   const n = rec ? rec.sources.length : 0;
   const barShown = main || phase === 'recording' || phase === 'paused';
   const showSources = multi && barShown;
-  // Audio only (Chrome and Edge): just the sound controls.
-  const soundsOnly = !multi && audioOnly && canArrange() && (!rec || rec.audioOnly) && barShown;
-  const showBar = showSources || soundsOnly;
-  els.sourcesPanel.hidden = !showBar;
-  els.cameraManageBtn.hidden = soundsOnly;
-  els.liveCorner.hidden = soundsOnly;
-  els.sourcesPanel.querySelector('.bar-divider').hidden = soundsOnly;
-  els.systemAudio.closest('.tool').hidden = audioOnly && canArrange();
+  const showSounds = canTabAudio && canArrange() && barShown && (multi || audioOnly);
+  const showCorner = showSources && !!(rec && rec.camStream && n);
+  els.sourcesPanel.hidden = !(showSources || showSounds);
+  els.liveCorner.hidden = !showCorner;
+  els.cornerDivider.hidden = !(showCorner && showSounds);
+  els.addSoundBtn.hidden = !showSounds || (!!rec && rec.sounds.length >= 2);
   const canAdd = showSources && (rec ? n < 2 : phase === 'setup' && !switching);
   const visual = !!rec && !audioOnly && (n > 0 || !!rec.camStream);
   els.addSourceBtn.hidden = !canAdd;
@@ -2380,17 +2459,12 @@ function render() {
   els.sourceList.hidden = !showSources || !n;
   els.previewBtn.hidden = !showSources || !visual || !els.video.requestFullscreen;
   els.stage.dataset.phase = phase;
-  if (showBar) {
-    els.addSoundBtn.disabled = switching || (!!rec && !rec.mixer);
-    els.addSoundBtn.hidden = !!rec && rec.sounds.length >= 2;
-    els.soundList.querySelectorAll('button').forEach((b) => { b.disabled = switching; });
-  }
+  els.addSoundBtn.disabled = switching || (!!rec && !rec.mixer);
+  els.soundList.querySelectorAll('button').forEach((b) => { b.disabled = switching; });
   if (showSources) {
     els.addSourceBtn.disabled = false;
     els.layoutSelect.disabled = n < 2;
     els.swapBtn.disabled = n < 2;
-    els.cameraManageBtn.disabled = switching;
-    els.liveCorner.disabled = !(rec ? rec.camStream : readSettings().cameraId !== 'none');
     els.sourceList.querySelectorAll('button').forEach((b) => { b.disabled = switching; });
   }
   els.liveSlot.hidden = !live;
@@ -2411,23 +2485,7 @@ function render() {
   els.pauseBtn.disabled = phase === 'stopping';
 
   const hasMic = !!(rec && rec.micStream);
-  const muted = !!(rec && rec.muted);
-  els.muteBtn.hidden = !hasMic;
-  els.muteLabel.textContent = muted ? 'Unmute mic' : 'Mute mic';
-  els.muteBtn.classList.toggle('is-active', muted);
-  els.micOnIcon.hidden = muted;
-  els.micOffIcon.hidden = !muted;
-  els.muteBtn.disabled = phase === 'stopping';
-
-  const hasCam = !!(rec && rec.camStream);
-  els.cameraBtn.hidden = !hasCam;
-  els.cameraLabel.textContent = rec && !rec.cameraVisible ? 'Show camera' : 'Hide camera';
-  els.cameraBtn.classList.toggle('is-active', !!(rec && hasCam && !rec.cameraVisible));
-  els.cameraBtn.disabled = phase === 'stopping';
   els.markerBtn.disabled = phase === 'stopping';
-
-  els.switchBtn.hidden = !(rec && rec.audioOnly && rec.sources.length);
-  els.switchBtn.disabled = switching || phase === 'stopping';
   els.popoutBtn.hidden = !canPip || !!pipWindow;
   els.popoutBtn.disabled = phase === 'stopping';
   els.stopBtn.disabled = phase === 'stopping';
@@ -2436,7 +2494,6 @@ function render() {
   const mixer = rec && rec.mixer;
   els.levels.hidden = !mixer;
   els.micLevel.hidden = !hasMic;
-  els.micLevel.classList.toggle('is-muted', muted);
   els.tabLevel.hidden = !(mixer && mixer.hasTabAudio);
 
   // Done view
@@ -2464,10 +2521,15 @@ function render() {
     text = 'Try Chrome, Edge, Firefox, or Safari on a computer.';
   } else if (audioOnly && live) {
     title = paused ? 'Paused' : 'Recording audio';
-  } else if ((phase === 'starting' && !arrangedFlow) || (switching && !rec)) {
+    if (rec && !rec.micStream && !rec.sounds.length) text = canTabAudio ? 'Turn on the mic or add sound.' : 'Turn on the mic.';
+  } else if (switching && !visual && !audioOnly) {
     title = 'Choose what to share';
     art = 'i-monitor';
   }
+  // Only on the preview, never in the recording: nothing is in the frame.
+  const empty = !!rec && !!rec.compositor && !visual && (live || arranging) && !switching && !cameraBusy;
+  els.stageNotice.hidden = !empty;
+  els.stageNotice.textContent = live ? 'Nothing showing · only sound is recorded' : 'Nothing showing yet';
   els.stageEmpty.querySelector('use').setAttribute('href', `#${art}`);
   els.stageEmpty.classList.toggle('is-big-add', canAdd && !visual);
   els.stageTitle.textContent = title;
@@ -2481,9 +2543,9 @@ function render() {
 const SHORTCUTS = [
   ['KeyR', 'R', 'Start or new recording'],
   ['KeyP', 'P', 'Pause or resume'],
-  ['KeyM', 'M', 'Mute or unmute mic'],
+  ['KeyM', 'M', 'Mic on or off'],
   ['KeyK', 'K', 'Add marker'],
-  ['KeyC', 'C', 'Show or hide camera'],
+  ['KeyC', 'C', 'Camera on or off'],
   ['KeyS', 'S', 'Stop'],
 ];
 function onKeydown(e) {
@@ -2508,9 +2570,9 @@ function onKeydown(e) {
       else handled = false;
       break;
     case 'KeyP': if (recording) togglePause(); else handled = false; break;
-    case 'KeyM': if (rec && rec.micStream) toggleMute(); else handled = false; break;
+    case 'KeyM': if (!els.micOn.disabled && !els.setupView.hidden || recording) setMicOn(!els.micOn.checked, { say: true }); else handled = false; break;
     case 'KeyK': if (recording) addMarker(); else if (phase === 'done') addMarkerHere(); else handled = false; break;
-    case 'KeyC': if (rec && rec.camStream) toggleCamera(); else handled = false; break;
+    case 'KeyC': if (cameraAllowed() && !els.camOn.disabled && (recording || !els.setupView.hidden)) setCameraOn(!els.camOn.checked, { say: true }); else handled = false; break;
     case 'KeyS': if (recording) stopRecording(); else handled = false; break;
     default: handled = false;
   }
@@ -2604,26 +2666,23 @@ els.video.addEventListener('loadedmetadata', () => {
 // ---------- Wiring ----------
 els.startBtn.addEventListener('click', start);
 els.pauseBtn.addEventListener('click', togglePause);
-els.muteBtn.addEventListener('click', toggleMute);
-els.cameraBtn.addEventListener('click', toggleCamera);
 els.markerBtn.addEventListener('click', addMarker);
 els.stopBtn.addEventListener('click', stopRecording);
-els.switchBtn.addEventListener('click', switchSource);
 els.addSourceBtn.addEventListener('click', addSource);
 els.swapBtn.addEventListener('click', swapSources);
 els.addSoundBtn.addEventListener('click', addSound);
 els.balanceRange.addEventListener('input', () => setBalanceIndex(Number(els.balanceRange.value)));
 els.previewBtn.addEventListener('click', previewFullScreen);
 els.layoutSelect.addEventListener('change', () => setLayoutMode(radioGroupValue(els.layoutSelect)));
-els.cameraManageBtn.addEventListener('click', onCameraButton);
 els.liveCorner.addEventListener('change', () => setCameraCorner(radioGroupValue(els.liveCorner)));
-els.micOn.addEventListener('change', onMicToggle);
+els.micOn.addEventListener('change', () => setMicOn(els.micOn.checked));
+els.camOn.addEventListener('change', () => setCameraOn(els.camOn.checked));
+els.micSelect.addEventListener('change', () => onDeviceChoice('mic'));
+els.cameraSelect.addEventListener('change', () => onDeviceChoice('camera'));
 els.popoutBtn.addEventListener('click', openPip);
 els.pipReturnBtn.addEventListener('click', closePip);
 els.newBtn.addEventListener('click', newRecording);
 els.saveBtn.addEventListener('click', saveResult);
-els.micAccessBtn.addEventListener('click', () => requestDeviceAccess('mic'));
-els.cameraAccessBtn.addEventListener('click', () => requestDeviceAccess('camera'));
 els.trimPanel.addEventListener('toggle', () => { if (els.trimPanel.open) ensureTrimPrep().catch(() => {}); });
 els.trimStart.addEventListener('input', () => onTrimInput('start'));
 els.trimEnd.addEventListener('input', () => onTrimInput('end'));
@@ -2640,8 +2699,8 @@ els.repairInput.addEventListener('change', () => {
   if (file) repairFile(file);
 });
 els.settings.addEventListener('toggle', () => store.set('settingsOpen', els.settings.open));
-[els.micSelect, els.noiseSuppression, els.echoCancellation, els.leveling, els.systemAudio, els.qualitySelect, els.formatSelect,
-  els.cameraSelect, els.cameraCorner, els.autoStopSelect, ...els.recordModeInputs, ...els.saveModeInputs]
+[els.noiseSuppression, els.echoCancellation, els.leveling, els.systemAudio, els.qualitySelect, els.formatSelect,
+  els.autoStopSelect, ...els.recordModeInputs, ...els.saveModeInputs]
   .forEach((el) => el.addEventListener('change', () => { saveSettings(); render(); }));
 for (const [input, key] of [[els.micVolume, 'mic'], [els.tabVolume, 'tab']]) {
   input.addEventListener('input', () => {
