@@ -3,17 +3,17 @@
 // ---------- Elements ----------
 const $ = (id) => document.getElementById(id);
 const els = {
-  stage: $('stage'), stageEmpty: $('stageEmpty'), stageNotice: $('stageNotice'), stageTitle: $('stageTitle'), stageText: $('stageText'), video: $('video'),
+  stage: $('stage'), stageEmpty: $('stageEmpty'), stageTitle: $('stageTitle'), stageText: $('stageText'), video: $('video'),
   installBtn: $('installBtn'),
-  setupView: $('setupView'), startBtn: $('startBtn'), startHint: $('startHint'), modeSwitch: $('modeSwitch'),
+  setupView: $('setupView'), startBtn: $('startBtn'), modeSwitch: $('modeSwitch'),
   setupTools: $('setupTools'), avTools: $('avTools'), micOn: $('micOn'), camOn: $('camOn'), cameraTool: $('cameraTool'), tabAudioTool: $('tabAudioTool'),
   sourcesPanel: $('sourcesPanel'), sourceList: $('sourceList'),
   addSourceBtn: $('addSourceBtn'), addSourceLabel: $('addSourceLabel'),
-  layoutSelect: $('layoutSelect'), swapBtn: $('swapBtn'), layoutDescription: $('layoutDescription'),
-  balanceRow: $('balanceRow'), balanceRange: $('balanceRange'), balanceOut: $('balanceOut'), previewBtn: $('previewBtn'),
+  layoutSelect: $('layoutSelect'), swapBtn: $('swapBtn'),
+  balanceRow: $('balanceRow'), balanceRange: $('balanceRange'), previewBtn: $('previewBtn'),
   addSoundBtn: $('addSoundBtn'), soundList: $('soundList'),
   liveCorner: $('liveCorner'), cornerDivider: $('cornerDivider'),
-  liveSlot: $('liveSlot'), liveControls: $('liveControls'), recPill: $('recPill'), recLabel: $('recLabel'), timer: $('timer'), liveNotes: $('liveNotes'),
+  liveSlot: $('liveSlot'), liveControls: $('liveControls'), recPill: $('recPill'), recLabel: $('recLabel'), timer: $('timer'),
   pauseBtn: $('pauseBtn'), pauseLabel: $('pauseLabel'), pauseIcon: $('pauseIcon'), resumeIcon: $('resumeIcon'),
   markerBtn: $('markerBtn'), popoutBtn: $('popoutBtn'), stopBtn: $('stopBtn'),
   levels: $('levels'), micLevel: $('micLevel'), tabLevel: $('tabLevel'), micMeterFill: $('micMeterFill'), tabMeterFill: $('tabMeterFill'),
@@ -22,15 +22,15 @@ const els = {
   doneView: $('doneView'), doneHeading: $('doneHeading'), fileMeta: $('fileMeta'), saveBtn: $('saveBtn'), saveLabel: $('saveLabel'), newBtn: $('newBtn'),
   trimPanel: $('trimPanel'), trimSummary: $('trimSummary'), trimStart: $('trimStart'), trimEnd: $('trimEnd'),
   trimStartOut: $('trimStartOut'), trimEndOut: $('trimEndOut'), trimStartHere: $('trimStartHere'), trimEndHere: $('trimEndHere'),
-  trimHint: $('trimHint'), applyTrimBtn: $('applyTrimBtn'), undoTrimBtn: $('undoTrimBtn'),
+  applyTrimBtn: $('applyTrimBtn'), undoTrimBtn: $('undoTrimBtn'),
   markersPanel: $('markersPanel'), markersSummary: $('markersSummary'), markerList: $('markerList'), markersEmpty: $('markersEmpty'),
   addMarkerHereBtn: $('addMarkerHereBtn'), copyChaptersBtn: $('copyChaptersBtn'),
   settings: $('settings'), settingsBody: $('settingsBody'), settingsSummary: $('settingsSummary'),
   micSelect: $('micSelect'), micProcessing: $('micProcessing'),
   noiseSuppression: $('noiseSuppression'), echoCancellation: $('echoCancellation'), leveling: $('leveling'), systemAudio: $('systemAudio'),
   recordModeInputs: [...document.querySelectorAll('input[name="recordMode"]')],
-  qualityField: $('qualityField'), qualitySelect: $('qualitySelect'), qualityHint: $('qualityHint'),
-  formatSelect: $('formatSelect'), formatHint: $('formatHint'),
+  qualityField: $('qualityField'), qualitySelect: $('qualitySelect'),
+  formatSelect: $('formatSelect'),
   cameraSelect: $('cameraSelect'),
   autoStopSelect: $('autoStopSelect'),
   savingGroup: $('savingGroup'), storageHint: $('storageHint'),
@@ -39,7 +39,7 @@ const els = {
   recovery: $('recovery'), recoveryList: $('recoveryList'),
   toolsRow: $('toolsRow'), repairBtn: $('repairBtn'), repairInput: $('repairInput'),
   confirmDialog: $('confirmDialog'), confirmTitle: $('confirmTitle'), confirmBody: $('confirmBody'), confirmOk: $('confirmOk'), confirmCancel: $('confirmCancel'),
-  status: $('status'), shortcutList: $('shortcutList'), playerShortcutList: $('playerShortcutList'), stageToast: $('stageToast'),
+  status: $('status'), stageToast: $('stageToast'),
 };
 
 // ---------- Capabilities ----------
@@ -120,15 +120,6 @@ function formatTimePrecise(ms) {
   const tenths = Math.round(ms / 100);
   const base = formatTime(Math.floor(tenths / 10) * 1000);
   return `${base}.${tenths % 10}`;
-}
-function spokenTime(ms) {
-  const total = Math.round(ms / 1000);
-  const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), s = total % 60;
-  const parts = [];
-  if (h) parts.push(`${h} hour${h === 1 ? '' : 's'}`);
-  if (m) parts.push(`${m} minute${m === 1 ? '' : 's'}`);
-  if (s || !parts.length) parts.push(`${s} second${s === 1 ? '' : 's'}`);
-  return parts.join(' ');
 }
 function formatBytes(bytes) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -255,23 +246,9 @@ function updateSettingsUI() {
     opt.hidden = audioOnly && opt.value === 'av1';
   }
   if (els.formatSelect.value !== s.format) els.formatSelect.value = s.format;
-  const formatHints = {
-    mp4: audioOnly ? 'Opens in Apple Music, QuickTime, and most apps.' : 'Opens in QuickTime, Photos, and nearly every app.',
-    vp9: audioOnly ? 'Smaller files. Plays in browsers and VLC, but not in Apple apps.' : 'Smaller files. Plays in browsers and VLC, but not in QuickTime.',
-    av1: 'Smallest files, but uses more processor time. Plays in browsers and VLC, but not in QuickTime.',
-  };
-  els.formatHint.textContent = formatHints[s.format] + (supportedMime('mp4', s.recordMode) ? '' : ' This browser can’t record MP4.');
-
-  // Quality: shown for screen recordings, with a size estimate.
   els.qualityField.hidden = audioOnly;
-  const preset = PRESETS[s.quality];
-  const bps = preset.video * FORMATS[s.format].bitrate + preset.audio;
-  els.qualityHint.textContent = `${preset.hint} Up to about ${formatBytes((bps / 8) * 3600)} per hour, often less.`;
-
-  const what = audioOnly ? 'Audio only' : `${{ compact: 'Compact', standard: 'Standard', high: 'High' }[s.quality]} ${s.format === 'mp4' ? 'MP4' : s.format === 'av1' ? 'AV1' : 'WebM'}`;
-  const saving = { browser: 'Saves as it records', file: 'Saves to a file' }[s.saveMode] || '';
-  els.settingsSummary.textContent = [what, saving]
-    .filter(Boolean).join(' · ');
+  els.settingsSummary.textContent = audioOnly ? (s.format === 'mp4' ? 'M4A' : 'WebM')
+    : `${{ compact: 'Compact', standard: 'Standard', high: 'High' }[s.quality]} · ${s.format === 'mp4' ? 'MP4' : s.format === 'av1' ? 'AV1' : 'WebM'}`;
 }
 function updateVolumeOutputs() {
   for (const [input, out, name] of [[els.micVolume, els.micVolumeOut, 'Microphone'], [els.tabVolume, els.tabVolumeOut, 'Tab audio']]) {
@@ -318,12 +295,9 @@ async function requestDeviceAccess(kind) {
   try {
     stopStream(await navigator.mediaDevices.getUserMedia(isCam ? { video: true } : { audio: true }));
     await refreshDevices();
-    announce(`${isCam ? 'Camera' : 'Microphone'} access allowed. Choose one from the list.`);
     (isCam ? els.cameraSelect : els.micSelect).focus();
   } catch (err) {
-    announce(err.name === 'NotAllowedError'
-      ? `${isCam ? 'Camera' : 'Microphone'} access was blocked. You can allow it from the site settings in your browser’s address bar.`
-      : `Couldn’t access a ${isCam ? 'camera' : 'microphone'} (${err.message || err.name}).`, 'warn');
+    announce(`${isCam ? 'Camera' : 'Mic'} ${err.name === 'NotAllowedError' ? 'blocked' : 'unavailable'}.`, 'warn');
   }
 }
 
@@ -425,7 +399,7 @@ async function lowSpaceWarning() {
   try {
     const { quota, usage } = await navigator.storage.estimate();
     const free = quota - usage;
-    if (free < 2 * 1024 ** 3) return `Only ${formatBytes(free)} of browser storage is free, which may not be enough for a long recording.`;
+    if (free < 2 * 1024 ** 3) return `Low storage: ${formatBytes(free)} free.`;
   } catch { /* unknown */ }
   return '';
 }
@@ -465,9 +439,7 @@ function writeChunk(session, data) {
     out.failed = true;
     console.error('Writing failed', err);
     const full = err && err.name === 'QuotaExceededError';
-    announce(out.kind === 'file'
-      ? `Couldn’t write to ${out.name}${full ? ' because the disk is full' : ''}. Recording stopped.`
-      : `Couldn’t keep saving${full ? ' because storage is full' : ''}, so the recording was stopped. Everything up to that point is kept.`, 'error');
+    announce(`${full ? 'Disk full' : 'Saving failed'}. Recording stopped.`, 'error');
     stopRecording();
   });
 }
@@ -909,11 +881,8 @@ function createCompositor({ width, height, corner, fps, onLayout }) {
 
 // ---------- Sources ----------
 let sourceSeq = 0;
-function surfaceName(source) {
-  return { browser: 'a tab', window: 'a window', monitor: 'a screen' }[source.surface] || 'a shared source';
-}
 // Browsers don't tell pages the title of a shared window or tab, so you can name each source.
-function sourceLabel(index, source) { return `${source.name || `Source ${index + 1}`} (${surfaceName(source)})`; }
+function sourceLabel(index, source) { return source.name || `Source ${index + 1}`; }
 
 // Opens the browser's picker. keepFocus keeps you on this page instead of jumping to what you
 // shared (Chrome), which is what you want while arranging or adding a second source.
@@ -929,62 +898,16 @@ async function pickSource(settings, { keepFocus = false } = {}) {
   return { id: ++sourceSeq, stream, track, surface, name: '' };
 }
 
-// How big a source will look, compared with on your screen, if the video is watched full screen
-// on a screen like yours. It's an estimate from pixel sizes: the app can't see the text itself.
-function relativeSize(source, rect, frameW, outputW) {
-  const dpr = window.devicePixelRatio || 1;
-  let nativeW = frameW;
-  try {
-    const caps = source.track.getCapabilities ? source.track.getCapabilities() : null;
-    const max = caps && caps.width && caps.width.max;
-    if (max && max >= frameW && max <= frameW * 4 && max <= 8192) nativeW = max;
-  } catch { /* use the frame size */ }
-  const logicalW = source.surface === 'monitor' ? screen.width : nativeW / dpr;
-  return (rect.w / outputW) * (screen.width / logicalW);
-}
-
-function describeLayout() {
-  if (!rec || !rec.compositor) return '';
-  const info = rec.compositor.layoutInfo();
-  if (!info) return '';
-  const shown = rec.sources.filter((s) => info.ids.includes(s.id));
-  if (!shown.length) return rec.camStream ? 'Your camera fills the frame.' : '';
-  const pct = shown.map((s) => {
-    const i = info.ids.indexOf(s.id);
-    return Math.round(relativeSize(s, info.rects[i], info.sizes[i].w, info.width) * 100);
-  });
-  const names = shown.map((s) => sourceLabel(rec.sources.indexOf(s), s).replace(/^Source/, 'source'));
-  const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
-  const parts = [];
-  if (shown.length === 2) {
-    const how = info.mode === 'side' ? 'Side by side' : 'One above the other';
-    parts.push(`${how}${info.requested === 'auto' ? ', chosen automatically because it gives them the most room' : ''}.`);
-    parts.push(info.mode === 'side'
-      ? `${cap(names[0])} is on the left and ${names[1]} is on the right.`
-      : `${cap(names[0])} is on top and ${names[1]} is below it.`);
-    parts.push(Math.abs(pct[0] - pct[1]) <= 5
-      ? `Both will look about ${Math.round((pct[0] + pct[1]) / 2)}% as big as they do on your screen.`
-      : `${cap(names[0])} will look about ${pct[0]}% as big as it does on your screen, and ${names[1]} about ${pct[1]}%.`);
-  } else {
-    parts.push(`${cap(names[0])} fills the frame${pct[0] < 100 ? `, and will look about ${pct[0]}% as big as it does on your screen` : ''}.`);
-  }
-  const small = shown.filter((s, i) => pct[i] < 60).map((s) => names[shown.indexOf(s)]);
-  if (small.length) {
-    parts.push(`Text in ${small.join(' and ')} may be hard to read. Making ${small.length > 1 ? 'those windows' : 'that window'} narrower, or ${small.length > 1 ? 'their' : 'its'} text bigger, would help.`);
-  }
-  return parts.join(' ');
-}
-
 function watchSource(source) {
   source.track.onended = () => {
     if (!rec || switching || !rec.sources.includes(source)) return;
     const index = rec.sources.indexOf(source);
     const label = sourceLabel(index, source);
-    // The recording carries on whatever is left, even nothing; before recording, an empty
+    // The recording carries on with whatever is left, even nothing; before recording, an empty
     // main screen goes back to the start.
     removeSourceNow(source);
-    if (phase === 'arranging' && sessionIsEmpty()) { cancelArrange(`${label} stopped sharing.`); return; }
-    announce(`${label} stopped sharing, so it was removed.${afterRemoval()}${isLive() ? ' Recording continues.' : ''}`);
+    if (phase === 'arranging' && sessionIsEmpty()) { cancelArrange(`${label} ended.`); return; }
+    announce(`${label} ended.`);
   };
 }
 function removeSourceNow(source) {
@@ -994,12 +917,6 @@ function removeSourceNow(source) {
   stopStream(source.stream);
   renderSources(true);
   render();
-}
-
-// What's shown once a source has gone.
-function afterRemoval() {
-  if (!rec || !rec.compositor || rec.sources.length) return '';
-  return rec.camStream ? ' Your camera fills the frame.' : ' Nothing is showing now.';
 }
 
 // Sources don't apply to audio-only recordings.
@@ -1016,7 +933,6 @@ async function addSource() {
   const first = !rec.sources.length;
   switching = true;
   render();
-  announce(`Choose a ${first ? '' : 'second '}window, tab, or screen. You’ll stay on this page${isLive() || first ? '' : ', and nothing is recorded yet'}.`);
   try {
     const s = await pickSource(rec.settings, { keepFocus: true });
     if (!rec) { stopStream(s.stream); return; }
@@ -1024,15 +940,11 @@ async function addSource() {
     rec.compositor.addSource(s.id, s.track);
     if (rec.mixer) rec.mixer.setDisplay(s.id, s.stream);
     watchSource(s);
-    await layoutIncludes(s.id);
     renderSources(true);
-    announce(first && phase === 'arranging'
-      ? `Sharing ${surfaceName(s)}. Nothing is recorded until you press Record. ${describeLayout()}`
-      : `Added ${sourceLabel(rec.sources.indexOf(s), s).replace(/^Source/, 'source')}. ${describeLayout()}`);
+    announce(`${sourceLabel(rec.sources.indexOf(s), s)} added.`);
     added = true;
   } catch (err) {
-    announce(err.name === 'NotAllowedError' ? 'No source was added.' : `Couldn’t add a source: ${err.message || err.name}`,
-      err.name === 'NotAllowedError' ? 'info' : 'error');
+    if (err.name !== 'NotAllowedError') announce(`Couldn’t add: ${err.message || err.name}`, 'error');
   } finally {
     switching = false;
     render();
@@ -1050,7 +962,6 @@ async function replaceSource(source) {
   switching = true;
   render();
   const index = rec.sources.indexOf(source);
-  announce(`Choose what to show instead of ${sourceLabel(index, source).replace(/^Source/, 'source')}.`);
   try {
     const next = await pickSource(rec.settings, { keepFocus: true });
     if (!rec || !rec.sources.includes(source)) { stopStream(next.stream); return; }
@@ -1062,10 +973,9 @@ async function replaceSource(source) {
     stopStream(source.stream);
     if (!rec.compositor && !rec.audioOnly) { els.video.srcObject = next.stream; els.video.play().catch(() => {}); }
     renderSources(true);
-    announce(`${sourceLabel(index, next)} is now shown.${rec.compositor ? ' ' + describeLayout() : ''}`);
+    announce(`${sourceLabel(index, next)} replaced.`);
   } catch (err) {
-    announce(err.name === 'NotAllowedError' ? 'Kept the current source.' : `Couldn’t switch source: ${err.message || err.name}`,
-      err.name === 'NotAllowedError' ? 'info' : 'error');
+    if (err.name !== 'NotAllowedError') announce(`Couldn’t replace: ${err.message || err.name}`, 'error');
   } finally {
     switching = false;
     render();
@@ -1079,8 +989,8 @@ function removeSource(source) {
   const label = sourceLabel(rec.sources.indexOf(source), source);
   removeSourceNow(source);
   // Before recording, removing the last thing goes back to an empty main screen.
-  if (phase === 'arranging' && sessionIsEmpty()) cancelArrange(`${label} removed. Nothing is shared now.`, { quiet: true });
-  else announce(`${label} removed.${rec.sources.length ? ' ' + describeLayout() : afterRemoval()}`);
+  if (phase === 'arranging' && sessionIsEmpty()) cancelArrange(`${label} removed.`, { quiet: true });
+  else announce(`${label} removed.`);
   els.addSourceBtn.focus();
 }
 
@@ -1089,14 +999,14 @@ function swapSources() {
   rec.sources.reverse();
   rec.compositor.swap();
   setBalanceIndex(BALANCE.length - 1 - balanceIndex(), { quiet: true }); // the bigger one stays bigger
-  setTimeout(() => { renderSources(true); announce(`Swapped. ${describeLayout()}`); }, 120);
+  setTimeout(() => { renderSources(true); announce('Swapped.'); }, 120);
 }
 
 function setLayoutMode(mode) {
   if (!rec || !rec.compositor) return;
   rec.compositor.setLayout(mode);
   store.set('layout', mode);
-  setTimeout(() => { renderSources(); announce(describeLayout()); }, 120);
+  setTimeout(() => renderSources(), 120);
 }
 
 // Size balance: how much bigger source 1 is than source 2. Remembered for next time, so a
@@ -1106,21 +1016,13 @@ function balanceIndex() {
   const i = Number(store.get('balance', 4));
   return Number.isInteger(i) && i >= 0 && i < BALANCE.length ? i : 4;
 }
+// Spoken as the slider's value: which source is bigger, and by how much.
 function balanceText() {
-  if (!rec || !rec.compositor || rec.sources.length < 2) return 'Same scale';
-  const info = rec.compositor.layoutInfo();
   const r = BALANCE[balanceIndex()];
-  const names = rec.sources.map((src, i) => src.name || `source ${i + 1}`);
-  const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+  if (r === 1) return 'Equal';
+  const names = rec && rec.sources.length === 2 ? rec.sources.map((src, i) => sourceLabel(i, src)) : ['Source 1', 'Source 2'];
   const times = (x) => Math.round(x * 10) / 10;
-  const how = r === 1 ? 'Same scale' : r > 1 ? `${cap(names[0])} ${times(r)} times as big` : `${cap(names[1])} ${times(1 / r)} times as big`;
-  if (!info || info.ids.length < 2) return how;
-  // Work out the sizes now rather than waiting for the next frame.
-  const sizes = rec.sources.map((src) => info.sizes[info.ids.indexOf(src.id)]);
-  if (sizes.some((z) => !z)) return how;
-  const layout = computeLayout(sizes, info.width, info.height, rec.compositor.layoutMode, r);
-  const pct = rec.sources.map((src, i) => Math.round(relativeSize(src, layout.rects[i], sizes[i].w, info.width) * 100));
-  return `${how}. ${cap(names[0])} ${pct[0]}%, ${names[1]} ${pct[1]}% of its size on your screen`;
+  return r > 1 ? `${names[0]} ${times(r)}×` : `${names[1]} ${times(1 / r)}×`;
 }
 function setBalanceIndex(i, { quiet = false } = {}) {
   store.set('balance', i);
@@ -1132,40 +1034,23 @@ function setBalanceIndex(i, { quiet = false } = {}) {
 function updateBalanceText() {
   const t = balanceText();
   els.balanceRange.setAttribute('aria-valuetext', t);
-  els.balanceOut.textContent = t.split('. ')[0];
 }
 
 function renameSource(src, value) {
   if (!rec || !rec.sources.includes(src)) return;
   const index = rec.sources.indexOf(src);
-  const before = sourceLabel(index, src);
   if (value.trim().slice(0, 60) === src.name) return;
   src.name = value.trim().slice(0, 60);
   const focused = document.activeElement && document.activeElement.classList.contains('source-name-input');
   renderSources(true);
   updateBalanceText();
   if (focused) els.sourceList.querySelectorAll('.source-name-input')[index].focus();
-  announce(src.name ? `${before} is now called ${src.name}.` : `${before} no longer has a name.`);
 }
 
 // Sighted people can check readability by viewing the preview at the size viewers will see it.
 function previewFullScreen() {
   if (!els.video.requestFullscreen || els.video.hidden) return;
-  els.video.requestFullscreen().then(() => announce('Showing the preview full screen. Press Escape to go back.'))
-    .catch((err) => announce(`Couldn’t show the preview full screen: ${err.message || err.name}`, 'error'));
-}
-
-// Waits (briefly) until a newly added source has been drawn, so its description is accurate.
-function layoutIncludes(id) {
-  return new Promise((resolve) => {
-    const t0 = performance.now();
-    const check = () => {
-      const info = rec && rec.compositor && rec.compositor.layoutInfo();
-      if (!rec || (info && info.ids.includes(id)) || performance.now() - t0 > 3000) resolve();
-      else setTimeout(check, 50);
-    };
-    check();
-  });
+  els.video.requestFullscreen().catch((err) => announce(`Couldn’t go full screen: ${err.message || err.name}`, 'error'));
 }
 
 // --- The camera and mic, on the main screen and while recording ---
@@ -1180,15 +1065,15 @@ async function setCameraOn(on, { say = false } = {}) {
   if (on) {
     // Turning it on from an empty main screen starts setting up, with the camera as the preview.
     if (!rec && !ensureSession({ openCam: false })) return;
-    await openCamera();
+    await openCamera({ quiet: !say });
   } else if (rec && rec.camStream) {
-    closeCamera();
+    closeCamera({ say });
   } else if (say) {
     announce('Camera off.');
   }
   render();
 }
-async function openCamera({ quiet = false } = {}) {
+async function openCamera({ quiet = true } = {}) {
   if (!rec || !rec.compositor || rec.camStream || cameraBusy) return;
   const session = rec;
   cameraBusy = true;
@@ -1198,11 +1083,11 @@ async function openCamera({ quiet = false } = {}) {
     if (rec !== session || !els.camOn.checked) { stopStream(cam); return; }
     attachCamera(cam);
     refreshDevices(); // names become available once access is allowed
-    if (!quiet) announce(rec.sources.length ? `Camera on, in the ${cornerName(rec.corner)} corner.` : 'Camera on. It fills the frame.');
+    if (!quiet) announce('Camera on.');
   } catch (err) {
     els.camOn.checked = false;
     saveSettings();
-    announce(err.name === 'NotAllowedError' ? 'Camera access was blocked.' : `Couldn’t open the camera: ${err.message || err.name}`, 'error');
+    announce(err.name === 'NotAllowedError' ? 'Camera blocked.' : 'Camera unavailable.', 'error');
   } finally {
     cameraBusy = false;
     render();
@@ -1223,18 +1108,18 @@ function attachCamera(cam) {
     els.camOn.checked = false;
     render();
     renderSources();
-    announce('The camera was disconnected.', 'warn');
+    announce('Camera disconnected.', 'warn');
     if (phase === 'arranging' && sessionIsEmpty()) cancelArrange('', { quiet: true });
   };
 }
-function closeCamera() {
+function closeCamera({ say = false } = {}) {
   const cam = rec.camStream;
   rec.camStream = null;
   rec.compositor.setCamera(null);
   stopStream(cam); // turns the camera (and its light) off
   renderSources();
-  if (phase === 'arranging' && sessionIsEmpty()) cancelArrange('Camera off.', { quiet: true });
-  else announce(rec.sources.length ? 'Camera off.' : 'Camera off. Nothing is showing now.');
+  if (phase === 'arranging' && sessionIsEmpty()) cancelArrange('', { quiet: true });
+  if (say) announce('Camera off.');
 }
 
 // The mic toggle: before recording it's just remembered; while recording it opens or closes
@@ -1267,7 +1152,7 @@ async function openMic(session, warnings = null) {
     if (session.mixer) session.mixer.setMic(mic.stream);
     stopStream(old);
     if (mic.fellBack) {
-      const note = 'The chosen microphone wasn’t available, so the default one is being used.';
+      const note = 'Using the default mic.';
       if (warnings) warnings.push(note); else announce(note, 'warn');
     }
     mic.stream.getAudioTracks()[0].onended = () => {
@@ -1276,15 +1161,13 @@ async function openMic(session, warnings = null) {
       session.micStream = null;
       els.micOn.checked = false;
       render();
-      announce('The microphone was disconnected.', 'warn');
+      announce('Mic disconnected.', 'warn');
     };
     refreshDevices();
     return true;
   } catch (err) {
     console.warn('Microphone failed', err);
-    const note = err.name === 'NotAllowedError'
-      ? 'Microphone access was blocked, so it isn’t being recorded.'
-      : 'No microphone could be opened, so it isn’t being recorded.';
+    const note = err.name === 'NotAllowedError' ? 'Mic blocked.' : 'Mic unavailable.';
     els.micOn.checked = false;
     if (warnings) warnings.push(note); else announce(note, 'error');
     return false;
@@ -1310,7 +1193,6 @@ async function onDeviceChoice(kind) {
   }
   select.dataset.value = select.value;
   saveSettings();
-  const name = select.selectedOptions[0] ? select.selectedOptions[0].textContent : '';
   if (kind === 'camera' && rec && rec.camStream && !cameraBusy) {
     const session = rec;
     cameraBusy = true;
@@ -1318,24 +1200,21 @@ async function onDeviceChoice(kind) {
       const cam = await getCamera({ cameraId: select.value });
       if (rec !== session || !rec.camStream) { stopStream(cam); return; }
       attachCamera(cam);
-      announce(`Switched to ${name}.`);
     } catch (err) {
-      announce(`Couldn’t switch cameras: ${err.message || err.name}`, 'error');
+      announce('Camera unavailable.', 'error');
     } finally {
       cameraBusy = false;
       render();
     }
   } else if (kind === 'mic' && rec && rec.micStream) {
-    if (await openMic(rec)) announce(`Switched to ${name}.`);
+    await openMic(rec);
   }
 }
-function cornerName(c) { return { br: 'bottom right', bl: 'bottom left', tr: 'top right', tl: 'top left' }[c] || 'bottom right'; }
 function setCameraCorner(c) {
   saveSettings();
   if (!rec || !rec.compositor) return;
   rec.corner = c;
   rec.compositor.setCorner(c);
-  announce(`Camera moved to the ${cornerName(c)} corner.`);
 }
 
 const radioGroupValue = (group) => { const c = group.querySelector('input:checked'); return c ? c.value : ''; };
@@ -1355,11 +1234,9 @@ function iconButton(icon, label, className, onClick) {
 function renderSources(rebuild = false) {
   const has = !!(rec && rec.compositor);
   renderSounds();
-  els.addSourceLabel.textContent = has ? 'Add source' : 'Add a screen, window, or tab';
   if (!has) {
     els.sourceList.replaceChildren();
     els.sourceList.hidden = true;
-    els.layoutDescription.textContent = '';
     els.balanceRow.hidden = true;
     els.previewBtn.hidden = true;
     setRadioGroup(els.liveCorner, readSettings().cameraCorner);
@@ -1381,18 +1258,10 @@ function renderSources(rebuild = false) {
       name.spellcheck = false;
       name.size = Math.max(6, Math.min(24, (src.name || name.placeholder).length + 1));
       name.setAttribute('aria-label', `Name for ${label}`);
-      name.title = 'Name this source';
       name.addEventListener('input', () => { name.size = Math.max(6, Math.min(24, (name.value || name.placeholder).length + 1)); });
       name.addEventListener('change', () => renameSource(src, name.value));
       name.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); renameSource(src, name.value); } });
-      const small = document.createElement('span');
-      small.className = 'small-text';
-      small.hidden = true;
-      small.setAttribute('aria-hidden', 'true');
-      small.innerHTML = '<svg class="icon" aria-hidden="true"><use href="#i-text"/></svg>Small text';
-      const detail = document.createElement('span');
-      detail.className = 'source-detail visually-hidden';
-      li.append(name, small, detail, iconButton('i-replace', `Replace ${label}`, 'chip-btn', () => replaceSource(src)));
+      li.append(name, iconButton('i-replace', `Replace ${label}`, 'chip-btn', () => replaceSource(src)));
       li.append(iconButton('i-x', `Remove ${label}`, 'chip-btn is-danger', () => removeSource(src)));
       return li;
     }));
@@ -1402,18 +1271,12 @@ function renderSources(rebuild = false) {
   [...els.sourceList.children].forEach((li, i) => {
     const src = rec.sources[i];
     const j = info ? info.ids.indexOf(src.id) : -1;
-    const detail = li.querySelector('.source-detail');
-    const small = li.querySelector('.small-text');
-    if (j < 0) { detail.textContent = 'Waiting for its first picture.'; small.hidden = true; return; }
+    if (j < 0) return;
     const r = info.rects[j];
     li.style.left = `${(r.x / info.width) * 100}%`;
     li.style.top = `${(r.y / info.height) * 100}%`;
     li.style.maxWidth = `${(r.w / info.width) * 100}%`;
-    const pct = Math.round(relativeSize(src, r, info.sizes[j].w, info.width) * 100);
-    small.hidden = pct >= 60;
-    detail.textContent = `${info.sizes[j].w} by ${info.sizes[j].h} pixels, looks about ${pct}% as big as on your screen${pct < 60 ? '; text may be hard to read' : ''}.`;
   });
-  els.layoutDescription.textContent = describeLayout();
   setRadioGroup(els.layoutSelect, rec.compositor.layoutMode);
   els.balanceRow.hidden = rec.sources.length < 2;
   els.previewBtn.hidden = !els.video.requestFullscreen;
@@ -1428,13 +1291,12 @@ async function addSound() {
   if (!rec.mixer || rec.sounds.length >= 2) return;
   switching = true;
   render();
-  announce('Choose a tab, and turn on sharing its audio. Only its sound is recorded.');
   try {
     const s = await pickSource({ ...rec.settings, systemAudio: true, recordMode: 'audio' }, { keepFocus: true });
     const [audio] = s.stream.getAudioTracks();
     if (!rec || !audio) {
       stopStream(s.stream);
-      if (rec) announce('That didn’t include any sound. Choose a tab and turn on sharing its audio.', 'warn');
+      if (rec) announce('No sound shared.', 'warn');
       return;
     }
     s.track.stop(); // the picture isn't needed
@@ -1442,17 +1304,16 @@ async function addSound() {
     rec.mixer.setDisplay(s.id, s.stream);
     audio.onended = () => { if (rec && rec.sounds.includes(s)) removeSound(s, { ended: true }); };
     renderSounds();
-    announce(`Added sound from ${surfaceName(s)}. It’s heard in the recording but not shown.`);
+    announce('Sound added.');
   } catch (err) {
-    announce(err.name === 'NotAllowedError' ? 'No sound was added.' : `Couldn’t add sound: ${err.message || err.name}`,
-      err.name === 'NotAllowedError' ? 'info' : 'error');
+    if (err.name !== 'NotAllowedError') announce(`Couldn’t add sound: ${err.message || err.name}`, 'error');
   } finally {
     switching = false;
     render();
     if (phase === 'arranging' && sessionIsEmpty()) cancelArrange('', { quiet: true });
   }
 }
-function soundLabel(s) { return `Sound ${rec.sounds.indexOf(s) + 1} (${surfaceName(s)})`; }
+function soundLabel(s) { return `Sound ${rec.sounds.indexOf(s) + 1}`; }
 function removeSound(s, { ended = false } = {}) {
   if (!rec || !rec.sounds.includes(s)) return;
   const label = soundLabel(s);
@@ -1461,7 +1322,7 @@ function removeSound(s, { ended = false } = {}) {
   stopStream(s.stream);
   renderSounds();
   render();
-  announce(ended ? `${label} stopped sharing.` : `${label} removed.`);
+  announce(ended ? `${label} ended.` : `${label} removed.`);
   if (phase === 'arranging' && sessionIsEmpty()) cancelArrange('', { quiet: true });
   if (!ended) els.addSoundBtn.focus();
 }
@@ -1532,8 +1393,7 @@ async function confirmReplacingRecovery() {
   const old = pendingRecovery;
   const ok = await askConfirm({
     title: 'Delete the unsaved recording?',
-    body: `Only one recording is kept in this browser, so starting a new one deletes the unsaved recording from ${old.when}.`,
-    confirmLabel: 'Delete and start recording',
+    confirmLabel: 'Delete',
   });
   if (!ok) return false;
   pendingRecovery = null;
@@ -1550,13 +1410,12 @@ function recordingFilename(settings) {
 // Opens the save dialog when saving to a chosen file. Returns false if the user cancelled.
 async function openFileOutputIfNeeded(settings, filename, warnings) {
   if (settings.saveMode !== 'file' || !canSaveToDisk) return { ok: true, output: null };
-  announce('Choose where to save the recording.');
   try {
     return { ok: true, output: await openOutputFile(filename) };
   } catch (err) {
     if (err.name === 'AbortError') return { ok: false };
     console.warn('Could not open output file', err);
-    warnings.push('Couldn’t open a file to save into, so the recording is kept in memory until you save it.');
+    warnings.push('Couldn’t open the file. Recording to memory.');
     return { ok: true, output: null };
   }
 }
@@ -1589,7 +1448,7 @@ function cancelArrange(reason = '', { quiet = false } = {}) {
   els.video.srcObject = null;
   setPhase('setup');
   renderSources(true);
-  announce(quiet ? reason : `${reason ? reason + ' ' : ''}Nothing was recorded.`.trim());
+  if (reason) announce(reason);
   if (!quiet) (multiSourceMode() ? els.addSourceBtn : els.startBtn).focus();
 }
 
@@ -1630,7 +1489,7 @@ async function startArranged() {
   if (!file.ok) {
     setPhase('arranging');
     if (sessionIsEmpty()) cancelArrange('', { quiet: true });
-    announce('Recording not started, because no save location was chosen.');
+    announce('Not started.');
     els.startBtn.focus();
     return;
   }
@@ -1642,7 +1501,7 @@ async function startArranged() {
 // camera, and sound can all be added while recording.
 function start() {
   if (phase === 'setup' && !rec && !ensureSession()) {
-    if (!canComposite) announce('This browser can’t combine what you share into a recording. Try a recent Chrome, Edge, Firefox, or Safari.', 'error');
+    if (!canComposite) announce('Not supported in this browser.', 'error');
     return undefined;
   }
   if (phase === 'arranging') return startArranged();
@@ -1662,7 +1521,7 @@ async function prepareRecording(session) {
       if (navigator.storage.persist) navigator.storage.persist().catch(() => {});
     } catch (err) {
       console.warn('Could not open browser storage', err);
-      warnings.push('Couldn’t use browser storage, so the recording is kept in memory until you save it.');
+      warnings.push('Browser storage unavailable. Recording to memory.');
     }
   }
   if (settings.micId !== 'none') await openMic(session, warnings);
@@ -1672,13 +1531,13 @@ async function prepareRecording(session) {
     catch (err) {
       console.warn('Camera failed', err);
       els.camOn.checked = false;
-      warnings.push(err.name === 'NotAllowedError' ? 'Camera access was blocked, so the camera isn’t shown.' : 'The camera couldn’t be opened, so it isn’t shown.');
+      warnings.push(err.name === 'NotAllowedError' ? 'Camera blocked.' : 'Camera unavailable.');
     }
   }
   refreshDevices(); // labels become available once permission is granted
   const first = session.sources[0];
   if (settings.systemAudio && first && ![...session.sources, ...session.sounds].some((s) => s.stream.getAudioTracks().length)) {
-    warnings.push('What you shared didn’t include audio. To record a tab’s sound, pick a tab and turn on “Share tab audio”.');
+    warnings.push('No tab sound shared.');
   }
 
   const fail = (message) => {
@@ -1718,7 +1577,7 @@ async function prepareRecording(session) {
   session.recorder.onstop = finalizeRecording;
   session.recorder.onerror = (e) => {
     console.error('MediaRecorder error', e.error || e);
-    announce(`Recording error: ${(e.error && e.error.message) || 'unknown problem'}. Saving what was captured.`, 'error');
+    announce(`Recording error: ${(e.error && e.error.message) || 'unknown'}.`, 'error');
     stopRecording();
   };
 
@@ -1734,11 +1593,7 @@ function beginRecording() {
   tick();
   renderSources(true);
   const w = rec.warnings;
-  // Recording with nothing to see (or hear) is fine, since things can be added as you go; say so once.
-  const notes = [];
-  if (rec.compositor && !rec.sources.length && !rec.camStream && !cameraBusy) notes.push('Nothing is showing yet: add a source or turn on your camera.');
-  if (rec.audioOnly && !rec.micStream && !rec.sounds.length) notes.push('Nothing is being heard yet: turn on the mic or add sound.');
-  announce(['Recording started.', ...w, ...notes].join(' '), w.length ? 'warn' : 'info');
+  announce(['Recording.', ...w].join(' '), w.length ? 'warn' : 'info');
   els.pauseBtn.focus();
 }
 
@@ -1752,19 +1607,8 @@ function tick() {
   const ms = elapsedMs();
   const t = formatTime(ms);
   els.timer.textContent = t;
-  document.title = `${phase === 'paused' ? '❚❚ Paused' : '● Recording'} ${t} · Screen Recorder`;
-  const notes = [];
-  if (rec.output && !rec.output.failed) {
-    notes.push(`Saving to ${rec.output.kind === 'file' ? rec.output.name : 'browser storage'} as it records · ${formatBytes(rec.output.bytes)}`);
-  }
-  if (rec.autoStopMs) notes.push(`Stops automatically in ${formatTime(Math.max(0, rec.autoStopMs - ms))}`);
-  if (rec.markers.length) notes.push(`${rec.markers.length} marker${rec.markers.length === 1 ? '' : 's'}`);
-  els.liveNotes.textContent = notes.join(' · ');
-  els.liveNotes.hidden = !notes.length;
-  if (rec.autoStopMs && phase === 'recording' && ms >= rec.autoStopMs) {
-    announce(`Stopped automatically after ${spokenTime(rec.autoStopMs)}.`);
-    stopRecording();
-  }
+  document.title = `${phase === 'paused' ? '❚❚' : '●'} ${t} · Screen Recorder`;
+  if (rec.autoStopMs && phase === 'recording' && ms >= rec.autoStopMs) stopRecording();
 }
 
 function togglePause() {
@@ -1773,12 +1617,12 @@ function togglePause() {
     rec.recorder.pause();
     rec.elapsed += performance.now() - rec.segmentStart;
     setPhase('paused');
-    announce('Recording paused.');
+    announce('Paused.');
   } else if (phase === 'paused' && rec.recorder.state === 'paused') {
     rec.recorder.resume();
     rec.segmentStart = performance.now();
     setPhase('recording');
-    announce('Recording resumed.');
+    announce('Resumed.');
   }
   tick();
 }
@@ -1788,7 +1632,7 @@ function addMarker() {
   const ms = elapsedMs();
   rec.markers.push({ ms, name: `Marker ${rec.markers.length + 1}` });
   tick();
-  announce(`Marker ${rec.markers.length} added at ${formatTime(ms)}.`);
+  announce(`Marker ${rec.markers.length}.`);
 }
 
 function stopRecording() {
@@ -1817,7 +1661,7 @@ async function finalizeRecording() {
   let blob, filename = session.filename, storedName = null, onDisk = false, warning = '';
 
   if (out && out.kind === 'file') {
-    announce('Finishing the file…');
+    announce('Saving…');
     try {
       await out.queue;
       if (out.failed) throw new Error('write failed');
@@ -1842,11 +1686,11 @@ async function finalizeRecording() {
         }
       } catch (err) {
         console.warn('Could not add the duration to the saved file', err);
-        warning = ' Some players may not be able to skip around in it.';
+        warning = ' Some players may not seek in it.';
       }
     }
   } else if (out && out.kind === 'browser') {
-    announce('Finishing the recording…');
+    announce('Saving…');
     try { await out.queue; } catch { /* already reported */ }
     try { await storage.call('close'); } catch (err) { console.warn('Closing the stored recording failed', err); }
     out.release();
@@ -1855,7 +1699,7 @@ async function finalizeRecording() {
     catch (err) { console.error('Could not read the stored recording', err); blob = null; }
     meta.set(out.name, { finished: true, durationMs });
     if (blob && blob.size) blob = await finalizeMedia(blob, container, { durationMs, chapters });
-    if (out.failed) warning = ' Storage ran out, so it ends early.';
+    if (out.failed) warning = ' Ends early: storage full.';
   } else {
     blob = new Blob(session.chunks, { type });
     if (blob.size) blob = await finalizeMedia(blob, container, { durationMs, chapters });
@@ -1866,22 +1710,16 @@ async function finalizeRecording() {
     els.video.srcObject = null;
     setPhase('setup');
     if (!out || !out.failed) {
-      announce(out && out.kind === 'file' && !blob
-        ? `Couldn’t finish writing ${out.name}. The recording was lost.`
-        : 'Nothing was captured, so there’s no file to save. Please try again.', 'error');
+      announce(out && out.kind === 'file' && !blob ? `Couldn’t finish ${out.name}.` : 'Nothing was recorded.', 'error');
     }
     els.startBtn.focus();
     return;
   }
 
-  const spoken = spokenTime(durationMs);
-  let message;
-  if (onDisk) message = `Recording finished: ${spoken}, saved as ${filename}.${warning}`;
-  else message = `Recording finished: ${spoken}.${warning} Save it to keep it.`;
   showResult({
     kind: 'recording', blob, container, mediaKind: session.audioOnly ? 'audio' : 'video', durationMs, filename,
     saved: onDisk, onDisk, storedName, markers: session.markers.map((m) => ({ ...m })),
-  }, onDisk ? 'Saved to your computer' : 'Your recording is ready', message, warning ? 'warn' : 'info');
+  }, onDisk ? 'Saved' : 'Done', warning.trim(), 'warn');
 }
 
 // ---------- The done view: playback, trim, markers, saving ----------
@@ -1904,7 +1742,7 @@ function showResult(r, heading, message, tone = 'info') {
   renderMarkers();
   updateFileMeta();
   setPhase('done');
-  announce(message, tone);
+  if (message) announce(message, tone);
   els.doneHeading.focus();
 }
 
@@ -1940,7 +1778,6 @@ function resetTrimControls() {
   for (const input of [els.trimStart, els.trimEnd]) { input.max = String(total); input.step = '0.1'; }
   els.trimStart.value = '0';
   els.trimEnd.value = String(total);
-  els.trimHint.textContent = '';
   els.trimSummary.textContent = '';
   els.undoTrimBtn.hidden = true;
   updateTrimOutputs();
@@ -1958,26 +1795,18 @@ function updateTrimOutputs() {
   els.trimEndOut.textContent = formatTimePrecise(end * 1000);
   els.trimStart.setAttribute('aria-valuetext', formatTimePrecise(start * 1000));
   els.trimEnd.setAttribute('aria-valuetext', formatTimePrecise(end * 1000));
-  if (result && result.cuts) {
-    const s = snappedStart(start * 1000);
-    els.trimHint.textContent = Math.abs(s - start * 1000) > 150
-      ? `Keeps ${formatTimePrecise(s)} to ${formatTimePrecise(end * 1000)}. The start moves back ${((start * 1000 - s) / 1000).toFixed(1)} seconds to the nearest keyframe, so the picture starts cleanly.`
-      : `Keeps ${formatTimePrecise(s)} to ${formatTimePrecise(end * 1000)}.`;
-    if (result.container === 'mp4') els.trimHint.textContent += ' MP4 files are trimmed in steps of about a second.';
-  }
 }
 async function ensureTrimPrep() {
   if (!result) return null;
   if (!result.trimPrep) {
     const r = result;
-    els.trimHint.textContent = 'Getting the recording ready to trim…';
     els.applyTrimBtn.disabled = true;
     r.trimPrep = prepareTrim(r.original.blob, r.container).then((prep) => {
       r.cuts = prep.cuts;
       if (result === r) { updateTrimOutputs(); render(); }
       return prep;
     }, (err) => {
-      if (result === r) { els.trimHint.textContent = err.message || 'This recording can’t be trimmed.'; r.trimError = true; render(); }
+      if (result === r) { announce('Can’t trim this recording.', 'error'); r.trimError = true; render(); }
       throw err;
     });
   }
@@ -1998,14 +1827,13 @@ function useCurrentPosition(which) {
   const t = els.video.currentTime + result.trimStartMs / 1000;
   (which === 'start' ? els.trimStart : els.trimEnd).value = String(t);
   onTrimInput(which);
-  announce(`${which === 'start' ? 'Start' : 'End'} set to ${formatTimePrecise(t * 1000)}.`);
+  announce(`${which === 'start' ? 'Start' : 'End'} ${formatTimePrecise(t * 1000)}.`);
 }
 async function applyTrim() {
   const r = result;
   if (!r || r.saving) return;
   r.saving = true;
   render();
-  announce('Trimming…');
   try {
     const prep = await ensureTrimPrep();
     const out = await prep.trim({
@@ -2023,10 +1851,10 @@ async function applyTrim() {
     els.undoTrimBtn.hidden = false;
     els.trimSummary.textContent = `${formatTimePrecise(out.startMs)} to ${formatTimePrecise(out.startMs + out.durationMs)}`;
     markDirty();
-    announce(`Trimmed. It now runs ${spokenTime(out.durationMs)}, starting at ${formatTimePrecise(out.startMs)}.`);
+    announce('Trimmed.');
   } catch (err) {
     console.error('Trim failed', err);
-    announce(err.message || 'Couldn’t trim the recording.', 'error');
+    announce('Couldn’t trim.', 'error');
   } finally {
     r.saving = false;
     render();
@@ -2043,7 +1871,7 @@ function undoTrim() {
   updateFileMeta();
   renderMarkers();
   markDirty();
-  announce('Trim undone. The whole recording is back.');
+  announce('Trim undone.');
   els.trimStart.focus();
 }
 
@@ -2080,7 +1908,7 @@ function renderMarkers() {
       result.markers.splice(result.markers.indexOf(m), 1);
       renderMarkers();
       markDirty();
-      announce(`Marker at ${shown} removed.`);
+      announce('Marker removed.');
       els.addMarkerHereBtn.focus();
     });
     li.append(jump, name, del);
@@ -2102,7 +1930,7 @@ function addMarkerHere() {
   const index = visibleMarkers().indexOf(m);
   const input = els.markerList.querySelectorAll('.marker-name')[index];
   if (input) { input.focus(); input.select(); }
-  announce(`Marker added at ${formatTime(ms - result.trimStartMs)}.`);
+  announce('Marker added.');
 }
 async function copyChapters() {
   const list = visibleMarkers().map((m) => ({ ms: m.ms - result.trimStartMs, name: m.name.trim() || 'Marker' }));
@@ -2111,9 +1939,9 @@ async function copyChapters() {
   const text = list.map((m) => `${formatTime(m.ms)} ${m.name}`).join('\n');
   try {
     await navigator.clipboard.writeText(text);
-    announce('Chapter list copied. It’s in the format YouTube uses for chapters in a description.');
+    announce('Copied.');
   } catch {
-    announce('Couldn’t copy to the clipboard.', 'error');
+    announce('Couldn’t copy.', 'error');
   }
 }
 
@@ -2148,7 +1976,6 @@ async function saveResult() {
   }
   r.saving = true;
   render();
-  announce(handle ? `Saving ${handle.name}…` : 'Preparing the file…');
   try {
     const blob = await exportResult(r);
     if (handle) {
@@ -2156,7 +1983,7 @@ async function saveResult() {
       await w.write(blob);
       await w.close();
       markSaved('picker');
-      announce(`Saved as ${handle.name}.`);
+      announce('Saved.');
     } else {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -2168,7 +1995,7 @@ async function saveResult() {
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 120_000);
       markSaved('download');
-      announce(`Saving ${r.filename} to your downloads.`);
+      announce('Downloading.');
     }
   } catch (err) {
     console.error('Save failed', err);
@@ -2231,11 +2058,11 @@ async function refreshRecovery({ announceFound = false } = {}) {
     del.textContent = 'Delete';
     del.setAttribute('aria-label', `Delete recording from ${when}`);
     del.addEventListener('click', async () => {
-      const ok = await askConfirm({ title: 'Delete this recording?', body: 'This can’t be undone.', confirmLabel: 'Delete' });
+      const ok = await askConfirm({ title: 'Delete this recording?', confirmLabel: 'Delete' });
       if (!ok) return;
       await storage.remove(item.name);
       await refreshRecovery();
-      announce('Recording deleted.');
+      announce('Deleted.');
       els.startBtn.focus();
     });
     actions.append(open, del);
@@ -2243,55 +2070,47 @@ async function refreshRecovery({ announceFound = false } = {}) {
     return li;
   }));
   els.recovery.hidden = items.length === 0;
-  if (announceFound && items.length) announce('Found an unsaved recording from earlier.');
+  if (announceFound && items.length) announce('Unsaved recording found.');
 }
 
 async function openStored(name) {
   if (phase !== 'setup') return;
-  announce('Opening the recording…');
   try {
     const file = await storage.getFile(name);
     const r = await repairMedia(file);
-    const note = r.trimmedBytes ? ' The last moment before it was interrupted couldn’t be kept.' : '';
     pendingRecovery = null;
     showResult({
       kind: 'recovered', blob: r.blob, container: r.format, mediaKind: r.hasVideo ? 'video' : 'audio',
       durationMs: r.durationMs, filename: name, saved: false, storedName: name,
-    }, 'Recovered recording', `Recovered a recording${r.durationMs != null ? ` of ${spokenTime(r.durationMs)}` : ''}.${note} Save it to keep it.`);
+    }, 'Recovered', '');
   } catch (err) {
     console.error(err);
-    announce(`Couldn’t open that recording: ${err.message || err.name}`, 'error');
+    announce('Couldn’t open it.', 'error');
   }
 }
 
 // ---------- Repair tool ----------
 async function repairFile(file) {
   if (phase !== 'setup') return;
-  announce(`Checking ${file.name}…`);
   try {
     const r = await repairMedia(file);
     const base = file.name.replace(/\.crswap$/i, '').replace(/\.(webm|mkv|mp4|m4a|mov)$/i, '');
     const ext = r.format === 'mp4' ? (r.hasVideo ? 'mp4' : 'm4a') : 'webm';
-    const parts = [`Repaired ${file.name}.${r.durationMs != null ? ` It’s ${spokenTime(r.durationMs)} long.` : ''}`];
-    if (r.trimmedBytes) parts.push('An incomplete bit at the end was removed.');
-    parts.push('Save the repaired copy to keep it. The original file isn’t changed.');
     showResult({
       kind: 'repaired', blob: r.blob, container: r.format, mediaKind: r.hasVideo ? 'video' : 'audio',
       durationMs: r.durationMs, filename: `${base}-repaired.${ext}`, saved: false,
-    }, 'Repaired recording ready', parts.join(' '));
+    }, 'Repaired', '');
   } catch (err) {
     console.warn('Repair failed', err);
-    announce(err.message || 'That file couldn’t be repaired.', 'error');
+    announce('Couldn’t repair it.', 'error');
   }
 }
 
 async function newRecording() {
   if (phase !== 'done' || (result && result.saving)) return;
   if (result && (!result.saved || result.dirty)) {
-    const repaired = result.kind === 'repaired';
     const ok = await askConfirm({
-      title: result.saved ? 'Discard your changes?' : repaired ? 'Discard the repaired copy?' : 'Discard this recording?',
-      body: result.saved ? 'Your trim and marker changes haven’t been saved.' : repaired ? 'The original file isn’t changed.' : 'It hasn’t been saved, so it will be gone for good.',
+      title: result.saved ? 'Discard changes?' : 'Discard this recording?',
       confirmLabel: 'Discard',
     });
     if (!ok || phase !== 'done') return;
@@ -2312,7 +2131,6 @@ async function newRecording() {
   setPhase('setup');
   renderSources(true);
   Promise.resolve(removal).then(() => refreshRecovery());
-  announce('Ready for a new recording.');
   els.startBtn.focus();
 }
 
@@ -2350,7 +2168,7 @@ async function openPip() {
   try {
     pipWindow = await documentPictureInPicture.requestWindow({ width: 560, height: 190 });
   } catch (err) {
-    announce(`Couldn’t open floating controls: ${err.message || err.name}`, 'error');
+    announce('Couldn’t open floating controls.', 'error');
     return;
   }
   const doc = pipWindow.document;
@@ -2379,16 +2197,16 @@ async function openPip() {
   });
   if (rec) { cancelAnimationFrame(rec.meterRaf); startMeter(); }
   render();
-  announce('Controls moved to a floating window.');
 }
 function closePip() { if (pipWindow) pipWindow.close(); }
 
 // ---------- Confirmation dialog ----------
-function askConfirm({ title, body, confirmLabel, danger = true }) {
+function askConfirm({ title, body = '', confirmLabel, danger = true }) {
   const d = els.confirmDialog;
-  if (typeof d.showModal !== 'function') return Promise.resolve(window.confirm(`${title}\n\n${body}`));
+  if (typeof d.showModal !== 'function') return Promise.resolve(window.confirm(title));
   els.confirmTitle.textContent = title;
   els.confirmBody.textContent = body;
+  els.confirmBody.hidden = !body;
   els.confirmOk.textContent = confirmLabel;
   els.confirmOk.className = `btn ${danger ? 'btn-danger' : 'btn-primary'}`;
   const opener = document.activeElement;
@@ -2418,14 +2236,8 @@ function render() {
   // The main screen: set up what to record, then start.
   const main = setup || arranging;
   const multi = canRecord && multiSourceMode();
-  const shared = !!rec && arranging;
   els.setupView.hidden = !main;
   els.startBtn.disabled = !(phase === 'setup' || phase === 'arranging') || !canRecord || switching;
-  // Only screen readers get this; sighted people can see what's shared.
-  els.startHint.textContent = !canRecord ? ''
-    : audioOnly ? `Starts straight away. Records your microphone${canTabAudio ? ' and any sound you add' : ''}.`
-    : shared ? 'Starts straight away. You can change what’s shared while recording.'
-    : 'Starts straight away, even with nothing shared yet: you can add sources while recording.';
   els.modeSwitch.hidden = !canRecord || !!rec;
 
   // The mic and camera sit on the main screen before recording and with the recording controls after.
@@ -2516,20 +2328,7 @@ function render() {
   els.stageEmpty.hidden = showVideo && !(audioOnly && phase === 'done');
   const settingsAudio = readSettings().recordMode === 'audio';
   let art = audioOnly || settingsAudio ? 'i-mic' : 'i-monitor', title = '', text = '';
-  if (!canRecord) {
-    title = 'Recording isn’t supported in this browser';
-    text = 'Try Chrome, Edge, Firefox, or Safari on a computer.';
-  } else if (audioOnly && live) {
-    title = paused ? 'Paused' : 'Recording audio';
-    if (rec && !rec.micStream && !rec.sounds.length) text = canTabAudio ? 'Turn on the mic or add sound.' : 'Turn on the mic.';
-  } else if (switching && !visual && !audioOnly) {
-    title = 'Choose what to share';
-    art = 'i-monitor';
-  }
-  // Only on the preview, never in the recording: nothing is in the frame.
-  const empty = !!rec && !!rec.compositor && !visual && (live || arranging) && !switching && !cameraBusy;
-  els.stageNotice.hidden = !empty;
-  els.stageNotice.textContent = live ? 'Nothing showing · only sound is recorded' : 'Nothing showing yet';
+  if (!canRecord) title = 'Not supported in this browser';
   els.stageEmpty.querySelector('use').setAttribute('href', `#${art}`);
   els.stageEmpty.classList.toggle('is-big-add', canAdd && !visual);
   els.stageTitle.textContent = title;
@@ -2540,14 +2339,6 @@ function render() {
 }
 
 // ---------- Keyboard shortcuts ----------
-const SHORTCUTS = [
-  ['KeyR', 'R', 'Start or new recording'],
-  ['KeyP', 'P', 'Pause or resume'],
-  ['KeyM', 'M', 'Mic on or off'],
-  ['KeyK', 'K', 'Add marker'],
-  ['KeyC', 'C', 'Camera on or off'],
-  ['KeyS', 'S', 'Stop'],
-];
 function onKeydown(e) {
   // Escape collapses the expandable panel you're in (Settings, Trim, Markers), or Settings if it's open.
   if (e.key === 'Escape' && !e.defaultPrevented && !els.confirmDialog.open) {
@@ -2578,30 +2369,6 @@ function onKeydown(e) {
   }
   if (handled) e.preventDefault();
 }
-function renderShortcuts() {
-  const mod = isMac ? '⌥' : 'Alt';
-  const item = (keys, label) => {
-    const li = document.createElement('li');
-    keys.forEach(([text, spoken], i) => {
-      if (i) li.append(' ');
-      const kbd = document.createElement('kbd');
-      kbd.textContent = text;
-      kbd.setAttribute('aria-label', spoken);
-      li.append(kbd);
-    });
-    li.append(` ${label}`);
-    return li;
-  };
-  const items = SHORTCUTS.filter(([code]) => code !== 'KeyC' || canComposite).map(([, key, label]) =>
-    item([[isMac ? `${mod}${key}` : `${mod}+${key}`, `${isMac ? 'Option' : 'Alt'} ${key}`]], label));
-  els.shortcutList.replaceChildren(...items);
-  const shift = (k) => (isMac ? `⇧${k}` : `Shift+${k}`);
-  els.playerShortcutList.replaceChildren(
-    item([[shift('<'), 'Shift less than'], [shift('>'), 'Shift greater than']], 'Slower, faster'),
-    item([[shift('←'), 'Shift left arrow'], [shift('→'), 'Shift right arrow']], 'Previous, next marker'),
-  );
-}
-
 // ---------- Player shortcuts (while the player has focus) ----------
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 let toastTimer;
@@ -2617,9 +2384,9 @@ function changeSpeed(dir) {
   SPEEDS.forEach((s, k) => { if (Math.abs(s - v.playbackRate) < Math.abs(SPEEDS[i] - v.playbackRate)) i = k; });
   const next = SPEEDS[Math.min(SPEEDS.length - 1, Math.max(0, i + dir))];
   v.playbackRate = next;
-  const label = next === 1 ? 'Normal speed' : `${next}× speed`;
-  showToast(next === 1 ? 'Normal speed' : `${next}×`);
-  announce(label + (next === SPEEDS[0] && dir < 0 ? ', the slowest' : next === SPEEDS[SPEEDS.length - 1] && dir > 0 ? ', the fastest' : '') + '.');
+  const label = next === 1 ? 'Normal speed' : `${next}×`;
+  showToast(label);
+  announce(label);
 }
 function jumpToMarker(dir) {
   if (!result) return;
@@ -2627,19 +2394,18 @@ function jumpToMarker(dir) {
   const marks = visibleMarkers()
     .map((m) => ({ t: (m.ms - result.trimStartMs) / 1000, name: m.name.trim() || 'Marker' }))
     .sort((a, b) => a.t - b.t);
-  if (!marks.length) { announce('This recording has no markers. Add some in the Markers panel.'); return; }
+  if (!marks.length) { announce('No markers.'); return; }
   const now = v.currentTime;
   // Like chapter skipping elsewhere: just after a marker, "previous" goes to the one before it.
   const target = dir > 0 ? marks.find((m) => m.t > now + 0.25) : [...marks].reverse().find((m) => m.t < now - 1);
   if (!target) {
-    if (dir < 0) { v.currentTime = 0; showToast('Start'); announce('Start of the recording.'); }
-    else announce('No more markers after this point.');
+    if (dir < 0) { v.currentTime = 0; showToast('Start'); announce('Start.'); }
+    else announce('Last marker.');
     return;
   }
   v.currentTime = target.t;
-  const n = marks.indexOf(target) + 1;
   showToast(target.name);
-  announce(`${target.name}, marker ${n} of ${marks.length}, at ${formatTime(target.t * 1000)}.`);
+  announce(target.name);
 }
 function onPlayerKeydown(e) {
   if (phase !== 'done' || e.altKey || e.ctrlKey || e.metaKey || !e.shiftKey) return false;
@@ -2740,7 +2506,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
   installPrompt = e;
   els.installBtn.hidden = false;
 });
-window.addEventListener('appinstalled', () => { installPrompt = null; els.installBtn.hidden = true; announce('Installed. You can open Screen Recorder from your Dock or Start menu.'); });
+window.addEventListener('appinstalled', () => { installPrompt = null; els.installBtn.hidden = true; announce('Installed.'); });
 els.installBtn.addEventListener('click', async () => {
   if (!installPrompt) return;
   installPrompt.prompt();
@@ -2753,7 +2519,6 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
 
 // ---------- Init ----------
 loadSettings();
-renderShortcuts();
 updateSettingsUI();
 els.balanceRange.max = String(BALANCE.length - 1);
 els.balanceRange.value = String(balanceIndex());
@@ -2765,4 +2530,4 @@ storage.init().then(() => {
   render();
   refreshRecovery({ announceFound: true });
 });
-if (!canRecord) announce('This browser can’t record the screen.', 'error');
+if (!canRecord) announce('Not supported in this browser.', 'error');

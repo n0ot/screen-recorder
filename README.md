@@ -8,8 +8,8 @@ A screen recorder that runs entirely in your browser. Nothing is uploaded: recor
 
 **Recording**
 - Record screens, windows, and tabs, with your microphone and the tabs' sound mixed in.
-- **Record starts straight away** with whatever you've set up, even nothing: you can add, replace, or remove sources, the camera, the mic, and sound while recording or paused. With nothing in the frame, the preview says so (the recording is just black), and only sound is recorded.
-- Show up to two windows, tabs, or screens at once, side by side or one above the other. The layout is chosen automatically to make both as big as possible, and described out loud: where each source is and roughly how big its text will look.
+- **Record starts straight away** with whatever you've set up, even nothing: you can add, replace, or remove sources, the camera, the mic, and sound while recording or paused. With nothing in the frame, the video is black.
+- Show up to two windows, tabs, or screens at once, side by side or one above the other. The layout is chosen automatically to make both as big as possible.
 - **Camera:** the toggle really turns the camera (and its light) on and off, as in a video call. With nothing else shared, the camera fills the frame; with a source, it's a circle in the corner you pick.
 - **Mic:** one toggle, before or during recording. The mic and camera start off and remember your last choice, and the small menu on each picks which device to use, also while recording.
 - Set things up first if you like: share sources on the main screen and check the layout. You stay on the page while you share, and nothing is recorded until you press Record.
@@ -35,7 +35,7 @@ A screen recorder that runs entirely in your browser. Nothing is uploaded: recor
 - Optionally record straight to a file you choose, such as one on an external drive (Chrome and Edge).
 - **Repair a recording:** fixes the length and seeking of WebM and MP4 files that were cut off, including Chrome's `.crswap` leftovers.
 
-Also: keyboard shortcuts, screen reader support, light and dark mode, works offline once installed, and fits any screen size.
+Also: keyboard shortcuts (shown to screen readers on each button), screen reader support, light and dark mode, works offline once installed, and fits any screen size.
 
 ## Keyboard shortcuts
 

@@ -57,7 +57,6 @@
       <h1>Screen Recorder</h1>
     </div>
     <div class="header-actions">
-      <p class="tagline"><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg>Stays on your device</p>
       <button id="installBtn" class="btn btn-ghost btn-sm" type="button" hidden>
         <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg><span>Install app</span>
       </button>
@@ -67,8 +66,7 @@
   <main class="card">
     <!-- Recovered recording -->
     <section id="recovery" class="recovery" aria-labelledby="recoveryHeading" hidden>
-      <h2 id="recoveryHeading">Unsaved recording recovered</h2>
-      <p class="visually-hidden">It was kept because the page closed unexpectedly. Leaving this page or starting a new recording deletes it.</p>
+      <h2 id="recoveryHeading">Unsaved recording</h2>
       <ul id="recoveryList"></ul>
     </section>
 
@@ -79,16 +77,15 @@
         <strong id="stageTitle"></strong>
         <span id="stageText"></span>
       </div>
-      <video id="video" playsinline muted hidden aria-label="Preview"></video>
+      <video id="video" playsinline muted hidden aria-label="Preview" aria-keyshortcuts="Shift+Comma Shift+Period Shift+ArrowLeft Shift+ArrowRight"></video>
       <ul id="sourceList" class="source-overlays" aria-label="Shared sources" hidden></ul>
       <button id="addSourceBtn" class="add-source" type="button">
         <span class="add-source-icon"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg></span>
-        <span id="addSourceLabel">Add a screen, window, or tab</span>
+        <span id="addSourceLabel">Add source</span>
       </button>
       <button id="previewBtn" class="stage-icon-btn" type="button" aria-label="View preview full screen" title="Full screen" hidden>
         <svg class="icon" aria-hidden="true"><use href="#i-expand"/></svg>
       </button>
-      <p id="stageNotice" class="stage-notice" hidden></p>
       <div id="stageToast" class="stage-toast" aria-hidden="true" hidden></div>
     </div>
 
@@ -104,10 +101,9 @@
         </fieldset>
         <span id="cornerDivider" class="bar-divider" aria-hidden="true"></span>
         <ul id="soundList" class="sound-list" aria-label="Sound only" hidden></ul>
-        <button id="addSoundBtn" class="chip" type="button" aria-describedby="addSoundHint">
+        <button id="addSoundBtn" class="chip" type="button">
           <svg class="icon" aria-hidden="true"><use href="#i-music"/></svg><span>Add sound</span>
         </button>
-        <span id="addSoundHint" class="visually-hidden">Records a tab’s sound, such as music, without showing it.</span>
       </div>
       <div id="balanceRow" class="bar-group layout-group" hidden>
         <fieldset id="layoutSelect" class="segmented">
@@ -125,9 +121,7 @@
           <input type="range" id="balanceRange" min="0" max="8" step="1" value="4">
           <span class="balance-end is-big" aria-hidden="true"></span>
         </label>
-        <output id="balanceOut" for="balanceRange" class="visually-hidden"></output>
       </div>
-      <p id="layoutDescription" class="visually-hidden"></p>
     </div>
 
     <div class="panel">
@@ -138,7 +132,7 @@
           <label><input type="radio" name="recordMode" id="recordModeScreen" value="screen" checked><svg class="icon" aria-hidden="true"><use href="#i-monitor"/></svg><span>Screen</span></label>
           <label><input type="radio" name="recordMode" id="recordModeAudio" value="audio"><svg class="icon" aria-hidden="true"><use href="#i-mic"/></svg><span>Audio</span></label>
         </fieldset>
-        <button id="startBtn" class="record-btn" type="button" aria-keyshortcuts="Alt+R" aria-describedby="startHint">
+        <button id="startBtn" class="record-btn" type="button" aria-keyshortcuts="Alt+R">
           <span class="record-dot" aria-hidden="true"></span><span>Record</span>
         </button>
         <div class="dock-group" id="setupTools">
@@ -167,7 +161,6 @@
             <span class="tool-label">Tab audio</span>
           </label>
         </div>
-        <p id="startHint" class="visually-hidden"></p>
       </section>
 
       <!-- Recording -->
@@ -211,12 +204,10 @@
               <output id="tabVolumeOut" for="tabVolume">100%</output>
             </div>
           </div>
-          <p id="liveNotes" class="live-notes hide-in-pip" hidden></p>
         </div>
         <div id="pipNote" class="pip-note" hidden>
           <svg class="icon" aria-hidden="true"><use href="#i-pip"/></svg>
-          <span>Controls are in a floating window.</span>
-          <button id="pipReturnBtn" class="btn-link" type="button">Bring them back</button>
+          <button id="pipReturnBtn" class="btn-link" type="button">Bring back controls</button>
         </div>
       </section>
 
@@ -253,7 +244,7 @@
                   <div class="trim-row"><output id="trimEndOut" for="trimEnd">0:00</output><button id="trimEndHere" class="btn-link" type="button">Use current position</button></div>
                 </div>
               </div>
-              <p id="trimHint" class="hint" aria-live="polite"></p>
+              
               <div class="toolbar">
                 <button id="applyTrimBtn" class="btn btn-ghost btn-sm" type="button">Apply trim</button>
                 <button id="undoTrimBtn" class="btn-link" type="button" hidden>Undo trim</button>
@@ -265,14 +256,13 @@
             <summary><svg class="icon" aria-hidden="true"><use href="#i-marker"/></svg>Markers <span id="markersSummary" class="drawer-summary"></span></summary>
             <div class="drawer-body">
               <ol id="markerList" class="marker-list"></ol>
-              <p id="markersEmpty" class="empty-note">No markers yet.</p>
+              <p id="markersEmpty" class="empty-note">No markers</p>
               <div class="toolbar">
                 <button id="addMarkerHereBtn" class="btn btn-ghost btn-sm" type="button" aria-keyshortcuts="Alt+K">
                   <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>Add at current position
                 </button>
                 <button id="copyChaptersBtn" class="btn-link" type="button">Copy chapter list</button>
               </div>
-              <p class="hint">Saved as chapters, which VLC and most players show.</p>
             </div>
           </details>
         </div>
@@ -293,7 +283,6 @@
                   <option value="high">High · 60 fps</option>
                 </select>
               </div>
-              <p class="hint" id="qualityHint"></p>
             </div>
             <div class="field">
               <label class="field-label" for="formatSelect">Format</label>
@@ -304,7 +293,6 @@
                   <option value="av1">WebM · AV1</option>
                 </select>
               </div>
-              <p class="hint" id="formatHint"></p>
             </div>
             <fieldset class="group" id="micProcessing">
               <legend>Microphone processing</legend>
@@ -326,10 +314,10 @@
             </div>
             <fieldset class="group" id="savingGroup">
               <legend>While recording, save to</legend>
-              <label class="check" id="saveModeBrowserLabel"><input type="radio" name="saveMode" id="saveModeBrowser" value="browser" checked> <span>Browser storage <small>Survives a crash</small></span></label>
-              <label class="check" id="saveModeFileLabel" hidden><input type="radio" name="saveMode" id="saveModeFile" value="file"> <span>A file you choose <small>Such as on an external drive</small></span></label>
-              <label class="check" id="saveModeMemoryLabel" hidden><input type="radio" name="saveMode" id="saveModeMemory" value="memory"> <span>Memory only <small>Lost if the browser crashes</small></span></label>
-              <p class="hint" id="storageHint" hidden>Browser storage isn’t available here. Serving the page from localhost should fix that.</p>
+              <label class="check" id="saveModeBrowserLabel"><input type="radio" name="saveMode" id="saveModeBrowser" value="browser" checked> <span>Browser storage</span></label>
+              <label class="check" id="saveModeFileLabel" hidden><input type="radio" name="saveMode" id="saveModeFile" value="file"> <span>A file you choose</span></label>
+              <label class="check" id="saveModeMemoryLabel" hidden><input type="radio" name="saveMode" id="saveModeMemory" value="memory"> <span>Memory only</span></label>
+              <p class="hint" id="storageHint" hidden>Browser storage unavailable.</p>
             </fieldset>
           </div>
         </fieldset>
@@ -351,17 +339,10 @@
   </dialog>
 
   <footer class="footer">
-    <div class="shortcuts" aria-labelledby="shortcutsHeading">
-      <h2 id="shortcutsHeading" class="visually-hidden">Keyboard shortcuts</h2>
-      <ul id="shortcutList"></ul>
-      <h2 id="playerShortcutsHeading" class="visually-hidden">In the player</h2>
-      <ul id="playerShortcutList" aria-labelledby="playerShortcutsHeading"></ul>
-    </div>
     <p id="toolsRow" class="tools">
-      <button id="repairBtn" class="btn-link" type="button" aria-describedby="repairHint">
+      <button id="repairBtn" class="btn-link" type="button">
         <svg class="icon" aria-hidden="true"><use href="#i-wrench"/></svg>Repair a recording
       </button>
-      <span id="repairHint" class="visually-hidden">Fixes the length and seeking of WebM and MP4 files that were cut off, including Chrome’s .crswap files.</span>
       <input id="repairInput" type="file" accept=".webm,.mp4,.m4a,.crswap,video/webm,video/mp4,audio/mp4,audio/webm" hidden>
     </p>
   </footer>
