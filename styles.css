@@ -432,6 +432,21 @@ input[type="range"] { accent-color: var(--accent); height: 24px; margin: 0; curs
 }
 .pip-body .tool-menu { top: -4px; left: calc(50% + 11px); width: 20px; height: 20px; }
 
+/* The mic options panel */
+.menu {
+  width: min(300px, calc(100vw - 16px));
+  padding: 14px; margin: 0;
+  display: grid; gap: 10px;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.18);
+  font-size: 0.9375rem;
+}
+.menu[popover] { position: fixed; inset: auto; }
+.menu[popover]:not(:popover-open) { display: none; }
+.menu.is-inline { position: absolute; z-index: 10; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); }
+.menu .field-label { margin: 0; }
+
 /* Recording */
 .live { display: grid; gap: 12px; }
 .rec-pill {

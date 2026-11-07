@@ -11,7 +11,7 @@ A screen recorder that runs entirely in your browser. Nothing is uploaded: recor
 - **Record starts straight away** with whatever you've set up, even nothing: you can add, replace, or remove sources, the camera, the mic, and sound while recording or paused. With nothing in the frame, the video is black.
 - Show up to two windows, tabs, or screens at once, side by side or one above the other. The layout is chosen automatically to make both as big as possible.
 - **Camera:** the toggle really turns the camera (and its light) on and off, as in a video call. With nothing else shared, the camera fills the frame; with a source, it's a circle in the corner you pick.
-- **Mic:** one toggle, before or during recording. The mic and camera start off and remember your last choice, and the small menu on each picks which device to use, also while recording.
+- **Mic:** one toggle, before or during recording. The mic and camera start off and remember your last choice. **Mic options** (the small arrow on the mic) picks the microphone and turns noise suppression, echo cancellation, and volume levelling on or off; the camera's arrow picks the camera. Both work while recording.
 - Set things up first if you like: share sources on the main screen and check the layout. You stay on the page while you share, and nothing is recorded until you press Record.
 - Name each source (browsers don't tell the page a window's title), make one bigger than the other with **Size balance** (remembered for next time), and view the live preview full screen to check readability.
 - **Add sound** (Chrome and Edge): record a tab's sound without showing it, such as music playing in the background (up to two). Works in audio-only recordings too.

@@ -26,7 +26,7 @@ const els = {
   markersPanel: $('markersPanel'), markersSummary: $('markersSummary'), markerList: $('markerList'), markersEmpty: $('markersEmpty'),
   addMarkerHereBtn: $('addMarkerHereBtn'), copyChaptersBtn: $('copyChaptersBtn'),
   settings: $('settings'), settingsBody: $('settingsBody'), settingsSummary: $('settingsSummary'),
-  micSelect: $('micSelect'), micProcessing: $('micProcessing'),
+  micSelect: $('micSelect'), micMenuBtn: $('micMenuBtn'), micMenu: $('micMenu'),
   noiseSuppression: $('noiseSuppression'), echoCancellation: $('echoCancellation'), leveling: $('leveling'),
   recordModeInputs: [...document.querySelectorAll('input[name="recordMode"]')],
   qualityField: $('qualityField'), qualitySelect: $('qualitySelect'),
@@ -1141,9 +1141,16 @@ async function setMicOn(on, { say = false } = {}) {
   }
 }
 // Opens the chosen microphone and feeds it into the mix. Returns true if it worked.
-async function openMic(session, warnings = null) {
+// closeFirst: Chrome shares one set of processing per microphone, so a change to it only takes
+// effect once the old stream is closed.
+async function openMic(session, warnings = null, { closeFirst = false } = {}) {
   if (micBusy) return false;
   micBusy = true;
+  if (closeFirst && session.micStream) {
+    if (session.mixer) session.mixer.setMic(null);
+    stopStream(session.micStream);
+    session.micStream = null;
+  }
   try {
     const mic = await getMic({ ...session.settings, micId: els.micSelect.value || 'default' });
     if (rec !== session) { stopStream(mic.stream); return false; }
@@ -1181,6 +1188,61 @@ function closeMic(session) {
   stopStream(session.micStream);
   session.micStream = null;
   render();
+}
+
+// Mic processing can change mid-recording: the mic reopens with the new settings.
+async function onProcessingChange() {
+  saveSettings();
+  if (!rec) return;
+  Object.assign(rec.settings, {
+    noiseSuppression: els.noiseSuppression.checked,
+    echoCancellation: els.echoCancellation.checked,
+    leveling: els.leveling.checked,
+  });
+  if (rec.micStream) await openMic(rec, null, { closeFirst: true });
+}
+
+// The mic options panel opens just above (or below) its button, wherever the controls are,
+// including the floating controls window.
+function setupMicMenu() {
+  const menu = els.micMenu, btn = els.micMenuBtn;
+  if (!('popover' in HTMLElement.prototype)) {
+    // Older browsers: a plain panel that the button shows and hides.
+    menu.removeAttribute('popover');
+    btn.removeAttribute('popovertarget');
+    menu.hidden = true;
+    menu.classList.add('is-inline');
+    btn.setAttribute('aria-expanded', 'false');
+    btn.setAttribute('aria-controls', 'micMenu');
+    btn.addEventListener('click', () => {
+      menu.hidden = !menu.hidden;
+      btn.setAttribute('aria-expanded', String(!menu.hidden));
+      if (!menu.hidden) els.micSelect.focus();
+    });
+    return;
+  }
+  menu.addEventListener('toggle', (e) => {
+    if (e.newState !== 'open') {
+      // Safari doesn't hand focus back to the button, so do it if it went nowhere.
+      const doc = btn.ownerDocument;
+      const a = doc.activeElement;
+      if (!a || a === doc.body || menu.contains(a)) btn.focus({ preventScroll: true });
+      return;
+    }
+    const view = btn.ownerDocument.defaultView || window;
+    const b = btn.getBoundingClientRect(), m = menu.getBoundingClientRect();
+    const left = Math.max(8, Math.min(b.left + b.width / 2 - m.width / 2, view.innerWidth - m.width - 8));
+    const above = b.top - m.height - 8;
+    menu.style.left = `${left}px`;
+    menu.style.top = `${above >= 8 ? above : b.bottom + 8}px`;
+    els.micSelect.focus();
+  });
+}
+
+function closeMicMenu() {
+  const menu = els.micMenu;
+  if (menu.classList.contains('is-inline')) { menu.hidden = true; els.micMenuBtn.setAttribute('aria-expanded', 'false'); return; }
+  try { if (menu.matches(':popover-open')) menu.hidePopover(); } catch { /* not supported */ }
 }
 
 // Choosing a different mic or camera from its menu switches straight away if it's in use.
@@ -2244,6 +2306,8 @@ function render() {
   const avLocked = !(main || phase === 'recording' || phase === 'paused');
   els.micOn.disabled = avLocked;
   els.micSelect.disabled = avLocked;
+  els.micMenuBtn.disabled = avLocked;
+  if (avLocked) closeMicMenu();
   els.cameraTool.hidden = !cameraAllowed();
   els.camOn.disabled = avLocked || cameraBusy;
   els.cameraSelect.disabled = avLocked || cameraBusy;
@@ -2336,6 +2400,11 @@ function render() {
 // ---------- Keyboard shortcuts ----------
 function onKeydown(e) {
   // Escape collapses the expandable panel you're in (Settings, Trim, Markers), or Settings if it's open.
+  // A popup (the mic options) closes itself.
+  if (e.key === 'Escape' && e.target.closest && e.target.closest('[popover], .menu')) {
+    if (els.micMenu.classList.contains('is-inline')) { els.micMenu.hidden = true; els.micMenuBtn.setAttribute('aria-expanded', 'false'); els.micMenuBtn.focus(); e.preventDefault(); }
+    return;
+  }
   if (e.key === 'Escape' && !e.defaultPrevented && !els.confirmDialog.open) {
     const doc = e.target.ownerDocument || document;
     const panel = (e.target.closest && e.target.closest('details[open]')) || (els.settings.open && !els.settings.hidden ? els.settings : null);
@@ -2460,7 +2529,8 @@ els.repairInput.addEventListener('change', () => {
   if (file) repairFile(file);
 });
 els.settings.addEventListener('toggle', () => store.set('settingsOpen', els.settings.open));
-[els.noiseSuppression, els.echoCancellation, els.leveling, els.qualitySelect, els.formatSelect,
+[els.noiseSuppression, els.echoCancellation, els.leveling].forEach((el) => el.addEventListener('change', onProcessingChange));
+[els.qualitySelect, els.formatSelect,
   els.autoStopSelect, ...els.recordModeInputs, ...els.saveModeInputs]
   .forEach((el) => el.addEventListener('change', () => { saveSettings(); render(); }));
 for (const [input, key] of [[els.micVolume, 'mic'], [els.tabVolume, 'tab']]) {
@@ -2513,6 +2583,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
 }
 
 // ---------- Init ----------
+setupMicMenu();
 loadSettings();
 updateSettingsUI();
 els.balanceRange.max = String(BALANCE.length - 1);

@@ -144,7 +144,14 @@
                 <span class="tool-icon"><svg class="icon on" aria-hidden="true"><use href="#i-mic"/></svg><svg class="icon off" aria-hidden="true"><use href="#i-mic-off"/></svg></span>
                 <span class="tool-label">Mic</span>
               </label>
-              <select id="micSelect" class="tool-menu" aria-label="Microphone" title="Choose microphone"><option value="default">Default microphone</option></select>
+              <button id="micMenuBtn" class="tool-menu" type="button" popovertarget="micMenu" aria-label="Mic options" title="Mic options"></button>
+              <div id="micMenu" class="menu" popover role="group" aria-label="Mic options">
+                <label class="field-label" for="micSelect">Microphone</label>
+                <div class="select-wrap"><select id="micSelect"><option value="default">Default microphone</option></select></div>
+                <label class="check"><input type="checkbox" id="noiseSuppression" checked> <span>Noise suppression</span></label>
+                <label class="check"><input type="checkbox" id="echoCancellation" checked> <span>Echo cancellation</span></label>
+                <label class="check"><input type="checkbox" id="leveling" checked> <span>Even out voice volume</span></label>
+              </div>
             </div>
             <div class="tool-wrap" id="cameraTool">
               <label class="tool">
@@ -289,12 +296,6 @@
                 </select>
               </div>
             </div>
-            <fieldset class="group" id="micProcessing">
-              <legend>Microphone processing</legend>
-              <label class="check"><input type="checkbox" id="noiseSuppression" checked> <span>Noise suppression</span></label>
-              <label class="check"><input type="checkbox" id="echoCancellation" checked> <span>Echo cancellation</span></label>
-              <label class="check"><input type="checkbox" id="leveling" checked> <span>Even out voice volume</span></label>
-            </fieldset>
             <div class="field">
               <label class="field-label" for="autoStopSelect">Stop automatically after</label>
               <div class="select-wrap">
