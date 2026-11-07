@@ -1,7 +1,7 @@
 'use strict';
 // Lets the app open offline once installed. Network first, so updates show up right away
 // whenever you're online; the cache is only used when the network isn't available.
-const CACHE = 'screen-recorder-v8';
+const CACHE = 'screen-recorder-v9';
 const FILES = [
   './',
   'index.html',
